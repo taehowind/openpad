@@ -12,13 +12,9 @@ import { useDialog } from "@/components/DialogProvider";
 import { QrModal } from "@/components/QrModal";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useToast } from "@/components/ToastProvider";
+import { responseError } from "@/lib/api-client";
 import { BOARD_BACKGROUNDS, type BoardBackground } from "@/lib/backgrounds";
 import type { AccountInfo, BoardAudience, BoardSummary, BoardType, InstructorListItem, InstructorRole, InstructorStatus, ShareMode } from "@/lib/types";
-
-async function responseError(response: Response, fallback: string) {
-  const data = await response.json().catch(() => ({}));
-  return data.error ?? fallback;
-}
 
 const STATUS_LABEL: Record<InstructorStatus, string> = { pending: "승인 대기", active: "활성", disabled: "비활성" };
 

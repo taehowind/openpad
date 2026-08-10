@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { canManageBoard, ensureMemberParticipant } from "@/lib/access";
 import { getInstructorSession, resolveParticipantForBoard } from "@/lib/auth";
-import { getBoardByShareId, getBoardPayload, touchPresence } from "@/lib/board-data";
+import { getBoardByShareId, touchPresence } from "@/lib/board-data";
+import { getBoardPayload } from "@/lib/board-payload";
 import { apiError } from "@/lib/http";
 
 type Context = { params: Promise<{ token: string }> };
