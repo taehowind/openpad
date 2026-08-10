@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Inter, Noto_Sans_KR } from "next/font/google";
-import { NightSkyBackground } from "@/components/NightSkyBackground";
+import { SkyBackground } from "@/components/SkyBackground";
 import { DialogProvider } from "@/components/DialogProvider";
 import { ToastProvider } from "@/components/ToastProvider";
 import "./globals.css";
@@ -23,7 +23,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body>
-        <NightSkyBackground />
+        <SkyBackground />
         <ToastProvider>
           <DialogProvider>{children}</DialogProvider>
         </ToastProvider>

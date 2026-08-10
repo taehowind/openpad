@@ -821,16 +821,17 @@ body:has(.modal-backdrop), body:has(.side-panel-backdrop) { overflow: hidden; }
 .bg-swatch { position: relative; overflow: hidden; }
 
 /* ============================================================
-   Dark mode — night sky backdrop
-   Rendered by <NightSkyBackground />. Fixed behind everything, never interactive.
+   Animated backdrop
+   Rendered by <SkyBackground />. Fixed behind everything, never interactive. One set of layers,
+   two readings: a night sky in dark mode, a daylit page in light mode.
 
-   The stars are tiled radial-gradients on three elements rather than hundreds of nodes, so the
-   whole sky costs ~8 composited layers. Depth is real: the fields sit at different translateZ
-   inside a perspective container and drift at different rates, so near stars outrun far ones.
+   The specks are tiled radial-gradients on three elements rather than hundreds of nodes, so the
+   whole scene costs ~8 composited layers. Depth is real: the fields sit at different translateZ
+   inside a perspective container and drift at different rates, so near ones outrun far ones.
    ============================================================ */
-.nightsky { display: none; }
+.skyscape { display: none; }
 
-[data-theme="dark"] .nightsky {
+[data-theme="dark"] .skyscape {
   position: fixed; z-index: -1; inset: 0; display: block; overflow: hidden;
   pointer-events: none; contain: strict;
   background:
@@ -839,20 +840,20 @@ body:has(.modal-backdrop), body:has(.side-panel-backdrop) { overflow: hidden; }
 }
 
 /* --- Nebula clouds: colour, kept desaturated so the sky stays night, not neon --- */
-[data-theme="dark"] .sky-nebula { position: absolute; inset: 0; }
-[data-theme="dark"] .nebula {
+[data-theme="dark"] .sky-wash { position: absolute; inset: 0; }
+[data-theme="dark"] .wash {
   position: absolute; display: block; border-radius: 50%;
   filter: blur(90px); will-change: transform;
 }
-[data-theme="dark"] .n-1 { top: -14%; left: -6%; width: 46vmax; height: 46vmax; opacity: .34; background: radial-gradient(circle at 40% 38%, #2a4bd8, transparent 68%); animation: nebula-a 68s ease-in-out infinite; }
-[data-theme="dark"] .n-2 { bottom: -20%; right: -8%; width: 42vmax; height: 42vmax; opacity: .28; background: radial-gradient(circle at 58% 46%, #6b2fb5, transparent 68%); animation: nebula-b 86s ease-in-out infinite; }
-[data-theme="dark"] .n-3 { top: 28%; left: 42%; width: 34vmax; height: 34vmax; opacity: .2; background: radial-gradient(circle at 50% 50%, #0e6b8f, transparent 70%); animation: nebula-a 104s ease-in-out infinite reverse; }
+[data-theme="dark"] .w-1 { top: -14%; left: -6%; width: 46vmax; height: 46vmax; opacity: .34; background: radial-gradient(circle at 40% 38%, #2a4bd8, transparent 68%); animation: wash-a 68s ease-in-out infinite; }
+[data-theme="dark"] .w-2 { bottom: -20%; right: -8%; width: 42vmax; height: 42vmax; opacity: .28; background: radial-gradient(circle at 58% 46%, #6b2fb5, transparent 68%); animation: wash-b 86s ease-in-out infinite; }
+[data-theme="dark"] .w-3 { top: 28%; left: 42%; width: 34vmax; height: 34vmax; opacity: .2; background: radial-gradient(circle at 50% 50%, #0e6b8f, transparent 70%); animation: wash-a 104s ease-in-out infinite reverse; }
 
-@keyframes nebula-a {
+@keyframes wash-a {
   0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
   50%      { transform: translate3d(4vw, 3vh, 0) scale(1.14); }
 }
-@keyframes nebula-b {
+@keyframes wash-b {
   0%, 100% { transform: translate3d(0, 0, 0) scale(1.06); }
   50%      { transform: translate3d(-5vw, -4vh, 0) scale(.94); }
 }
@@ -868,8 +869,8 @@ body:has(.modal-backdrop), body:has(.side-panel-backdrop) { overflow: hidden; }
 @keyframes band-breathe { 0%, 100% { opacity: .42; } 50% { opacity: .58; } }
 
 /* --- Parallax star fields --- */
-[data-theme="dark"] .sky-stars { position: absolute; inset: 0; perspective: 800px; transform-style: preserve-3d; }
-[data-theme="dark"] .star-field {
+[data-theme="dark"] .sky-drift { position: absolute; inset: 0; perspective: 800px; transform-style: preserve-3d; }
+[data-theme="dark"] .drift-field {
   position: absolute; inset: -30%;
   background-repeat: repeat;
   will-change: transform, opacity;
@@ -956,19 +957,19 @@ body:has(.modal-backdrop), body:has(.side-panel-backdrop) { overflow: hidden; }
 @keyframes twinkle-near { 0%, 100% { opacity: 1; } 60% { opacity: .68; } }
 
 /* --- Meteors: rare, quick, and never in step with each other --- */
-[data-theme="dark"] .sky-meteors { position: absolute; inset: 0; }
-[data-theme="dark"] .meteor {
+[data-theme="dark"] .sky-streaks { position: absolute; inset: 0; }
+[data-theme="dark"] .streak {
   position: absolute; display: block; width: 190px; height: 1.5px; opacity: 0;
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .95));
   border-radius: 2px;
   filter: drop-shadow(0 0 6px rgba(170, 200, 255, .9));
   will-change: transform, opacity;
 }
-[data-theme="dark"] .m-1 { top: 12%; left: -14%; animation: meteor-fall 17s linear infinite; animation-delay: 3s; }
-[data-theme="dark"] .m-2 { top: 34%; left: 8%; animation: meteor-fall 23s linear infinite; animation-delay: 11s; }
-[data-theme="dark"] .m-3 { top: 6%; left: 46%; animation: meteor-fall 31s linear infinite; animation-delay: 19s; }
+[data-theme="dark"] .s-1 { top: 12%; left: -14%; animation: streak-fall 17s linear infinite; animation-delay: 3s; }
+[data-theme="dark"] .s-2 { top: 34%; left: 8%; animation: streak-fall 23s linear infinite; animation-delay: 11s; }
+[data-theme="dark"] .s-3 { top: 6%; left: 46%; animation: streak-fall 31s linear infinite; animation-delay: 19s; }
 
-@keyframes meteor-fall {
+@keyframes streak-fall {
   0%   { opacity: 0; transform: rotate(28deg) translate3d(0, 0, 0); }
   2%   { opacity: 1; }
   9%   { opacity: 0; transform: rotate(28deg) translate3d(70vw, 0, 0); }
@@ -985,10 +986,10 @@ body:has(.modal-backdrop), body:has(.side-panel-backdrop) { overflow: hidden; }
 
 /* Decoration only — hold it still when the visitor asks for less motion. */
 @media (prefers-reduced-motion: reduce) {
-  [data-theme="dark"] .nebula,
+  [data-theme="dark"] .wash,
   [data-theme="dark"] .sky-band,
-  [data-theme="dark"] .star-field { animation: none; }
-  [data-theme="dark"] .meteor { display: none; }
+  [data-theme="dark"] .drift-field { animation: none; }
+  [data-theme="dark"] .streak { display: none; }
 }
 
 /* ============================================================
