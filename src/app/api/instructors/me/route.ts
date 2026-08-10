@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getInstructorById, updateOwnProfile } from "@/lib/accounts";
 import { getInstructorSession } from "@/lib/auth";
-import { apiError, rateLimited } from "@/lib/http";
+import { apiError, rateLimitedShared } from "@/lib/http";
 
 /**
  * The signed-in instructor editing their own name and password.
@@ -26,8 +26,12 @@ export async function PATCH(request: Request) {
   const session = await getInstructorSession();
   if (!session) return apiError("로그인이 필요합니다.", 401);
 
-  // Authenticated already, but the current-password check below is still worth guessing at.
-  if (rateLimited(`profile:${session.id}`, 10, 60_000)) {
+  // This verifies a password, so it is a guessing target even though the caller is already signed
+  // in — a borrowed session plus a few thousand tries would otherwise hand over the account. That
+  // makes it an auth path, and auth paths need the database-backed limiter: the in-memory one
+  // counts per instance, so on serverless the real limit is 10 times however many instances happen
+  // to be warm.
+  if (await rateLimitedShared(`profile:${session.id}`, 10, 60_000)) {
     return apiError("잠시 후 다시 시도해 주세요.", 429);
   }
 

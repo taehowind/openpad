@@ -5,7 +5,7 @@ import { actorForBoard } from "@/lib/access";
 import { setParticipantSession } from "@/lib/auth";
 import { getBoardById, now, recordAction } from "@/lib/board-data";
 import { run, transaction } from "@/lib/db";
-import { apiError } from "@/lib/http";
+import { apiError, rateLimited } from "@/lib/http";
 import { isProfileEmoji } from "@/lib/profile";
 
 type Context = { params: Promise<{ slug: string }> };
@@ -17,6 +17,11 @@ export async function PATCH(request: Request, context: Context) {
   if (!board) return apiError("보드를 찾을 수 없습니다.", 404);
   const access = await actorForBoard(board);
   if (!access || access.isAdmin || !access.participant) return apiError("참여자 프로필을 찾을 수 없습니다.", 403);
+  // Every other route a student can write to is capped; this one writes three rows and reissues a
+  // cookie per call, so it should be too. Generous enough that nobody renaming themselves notices.
+  if (rateLimited(`profile-edit:${access.participant.participantId}`, 20, 60_000)) {
+    return apiError("프로필을 너무 자주 변경하고 있습니다.", 429);
+  }
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success || !isProfileEmoji(parsed.data.emoji)) return apiError("닉네임과 이모티콘을 다시 확인해 주세요.");
   const deviceId = access.participant.deviceId ?? randomUUID();
