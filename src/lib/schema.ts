@@ -190,20 +190,28 @@ async function migrate(driver: Driver) {
 }
 
 /**
- * Runs the schema bootstrap once. On Postgres this is wrapped in an advisory lock: serverless
- * cold starts can fire several instances at the same moment, and concurrent CREATE TABLE /
- * CREATE INDEX statements race on the system catalogue.
+ * Runs the schema bootstrap once. On Postgres it runs inside a single transaction holding a
+ * transaction-scoped advisory lock: serverless cold starts can fire several instances at the same
+ * moment, and concurrent CREATE TABLE / CREATE INDEX statements race on the system catalogue.
+ *
+ * Both halves of that sentence matter, because a connection pooler in transaction mode (Supabase's
+ * is, on port 6543) gives each *transaction* whichever backend is free rather than keeping one per
+ * client. Taking a session-scoped pg_advisory_lock in one statement and releasing it in another —
+ * which is what this used to do — fails three ways at once there, all three reproduced against a
+ * real project: two instances get handed the same backend and both "acquire" the lock, so it
+ * excludes nothing; the unlock lands on a backend that never held it and returns false; and the
+ * lock then survives on the original backend, blocking every later cold start until that backend
+ * is terminated. A transaction is pinned to one backend for its whole life, and
+ * pg_advisory_xact_lock is released by COMMIT, so none of the three can happen.
  */
 export async function applySchema(driver: Driver) {
   if (driver.dialect !== "postgres") return migrate(driver);
 
   const LOCK_KEY = 8_147_326_155; // arbitrary but stable, namespaced to this app
-  await driver.exec(`SELECT pg_advisory_lock(${LOCK_KEY})`);
-  try {
+  await driver.transaction(async () => {
+    await driver.exec(`SELECT pg_advisory_xact_lock(${LOCK_KEY})`);
     await migrate(driver);
-  } finally {
-    await driver.exec(`SELECT pg_advisory_unlock(${LOCK_KEY})`);
-  }
+  });
 }
 
 // Bootstrap a super-admin from env so the very first login works without a pre-seeded database.

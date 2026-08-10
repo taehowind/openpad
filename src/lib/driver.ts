@@ -138,11 +138,14 @@ async function createPostgresDriver(url: string): Promise<Driver> {
       if (active) await active.query(sql, []); else await pool.query(sql);
     },
     async columns(table) {
-      const result = await pool.query(
-        "SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = $1",
+      // Through `query`, not the pool directly: the schema bootstrap runs inside a transaction,
+      // and a separate connection cannot see DDL that transaction has not committed yet — it
+      // would report a freshly created table as having no columns at all.
+      const result = await query(
+        "SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = ?",
         [table],
       );
-      return result.rows.map((row: { column_name: string }) => row.column_name);
+      return (result.rows as { column_name: string }[]).map((row) => row.column_name);
     },
     async transaction<T>(fn: () => Promise<T>): Promise<T> {
       if (context.getStore()) return fn();
