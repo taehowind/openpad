@@ -1007,11 +1007,11 @@ body:has(.modal-backdrop), body:has(.side-panel-backdrop) { overflow: hidden; }
 [data-theme="light"] .sky-wash { position: absolute; inset: 0; }
 [data-theme="light"] .wash {
   position: absolute; display: block; border-radius: 50%;
-  filter: blur(100px); will-change: transform;
+  filter: blur(72px); will-change: transform;
 }
-[data-theme="light"] .w-1 { top: -18%; left: -8%; width: 48vmax; height: 48vmax; opacity: .5; background: radial-gradient(circle at 40% 38%, #f2d3b4, transparent 68%); animation: wash-a 74s ease-in-out infinite; }
-[data-theme="light"] .w-2 { bottom: -22%; right: -10%; width: 44vmax; height: 44vmax; opacity: .42; background: radial-gradient(circle at 58% 46%, #cddcea, transparent 68%); animation: wash-b 92s ease-in-out infinite; }
-[data-theme="light"] .w-3 { top: 26%; left: 40%; width: 36vmax; height: 36vmax; opacity: .34; background: radial-gradient(circle at 50% 50%, #d8e6d4, transparent 70%); animation: wash-a 112s ease-in-out infinite reverse; }
+[data-theme="light"] .w-1 { top: -16%; left: -8%; width: 52vmax; height: 52vmax; opacity: .8; background: radial-gradient(circle at 40% 38%, #f7c69a, transparent 66%); animation: wash-a 44s ease-in-out infinite; }
+[data-theme="light"] .w-2 { bottom: -20%; right: -10%; width: 48vmax; height: 48vmax; opacity: .72; background: radial-gradient(circle at 58% 46%, #a9c8e8, transparent 66%); animation: wash-b 56s ease-in-out infinite; }
+[data-theme="light"] .w-3 { top: 22%; left: 38%; width: 42vmax; height: 42vmax; opacity: .6; background: radial-gradient(circle at 50% 50%, #bfe0c4, transparent 68%); animation: wash-a 68s ease-in-out infinite reverse; }
 
 /* --- A shaft of light raked across the page, where dark mode has the milky way --- */
 [data-theme="light"] .sky-band {
@@ -1031,28 +1031,28 @@ body:has(.modal-backdrop), body:has(.side-panel-backdrop) { overflow: hidden; }
 }
 [data-theme="light"] .field-far {
   background-image:
-    radial-gradient(2px 2px at 22px 40px, rgba(150, 132, 104, .3), transparent),
-    radial-gradient(2px 2px at 128px 96px, rgba(126, 142, 158, .26), transparent),
-    radial-gradient(2px 2px at 232px 188px, rgba(150, 132, 104, .24), transparent),
-    radial-gradient(2px 2px at 76px 244px, rgba(138, 150, 128, .24), transparent),
-    radial-gradient(2px 2px at 286px 58px, rgba(150, 132, 104, .22), transparent);
+    radial-gradient(2px 2px at 22px 40px, rgba(138, 116, 82, .5), transparent),
+    radial-gradient(2px 2px at 128px 96px, rgba(104, 126, 152, .44), transparent),
+    radial-gradient(2px 2px at 232px 188px, rgba(138, 116, 82, .42), transparent),
+    radial-gradient(2px 2px at 76px 244px, rgba(116, 140, 112, .42), transparent),
+    radial-gradient(2px 2px at 286px 58px, rgba(138, 116, 82, .4), transparent);
   background-size: 340px 340px;
   animation: drift-far 240s linear infinite, mote-far 11s ease-in-out infinite;
 }
 [data-theme="light"] .field-mid {
   background-image:
-    radial-gradient(2.5px 2.5px at 54px 74px, rgba(146, 124, 92, .34), transparent),
-    radial-gradient(2.5px 2.5px at 198px 26px, rgba(120, 138, 158, .3), transparent),
-    radial-gradient(2.5px 2.5px at 106px 210px, rgba(146, 124, 92, .28), transparent),
-    radial-gradient(2.5px 2.5px at 258px 142px, rgba(134, 148, 124, .28), transparent);
+    radial-gradient(2.5px 2.5px at 54px 74px, rgba(134, 108, 74, .56), transparent),
+    radial-gradient(2.5px 2.5px at 198px 26px, rgba(98, 122, 150, .5), transparent),
+    radial-gradient(2.5px 2.5px at 106px 210px, rgba(134, 108, 74, .48), transparent),
+    radial-gradient(2.5px 2.5px at 258px 142px, rgba(110, 136, 106, .48), transparent);
   background-size: 300px 300px;
   animation: drift-mid 150s linear infinite, mote-mid 8s ease-in-out infinite;
 }
 [data-theme="light"] .field-near {
   background-image:
-    radial-gradient(3.5px 3.5px at 90px 130px, rgba(140, 116, 84, .3), transparent),
-    radial-gradient(3.5px 3.5px at 268px 62px, rgba(112, 132, 154, .26), transparent),
-    radial-gradient(3px 3px at 176px 250px, rgba(140, 116, 84, .24), transparent);
+    radial-gradient(3.5px 3.5px at 90px 130px, rgba(128, 100, 66, .54), transparent),
+    radial-gradient(3.5px 3.5px at 268px 62px, rgba(92, 116, 146, .46), transparent),
+    radial-gradient(3px 3px at 176px 250px, rgba(128, 100, 66, .44), transparent);
   background-size: 380px 380px;
   animation: drift-near 90s linear infinite, mote-near 6s ease-in-out infinite;
 }
@@ -1098,6 +1098,16 @@ body:has(.modal-backdrop), body:has(.side-panel-backdrop) { overflow: hidden; }
    backdrop with it. Being explicit costs a line and removes the trapdoor. */
 html[data-theme="light"] { background: var(--canvas); }
 [data-theme="light"] body { background: transparent; }
+
+/* These are full-bleed and opaque, so they hide the backdrop completely — the page colour they
+   paint is already coming from <html> underneath. Dark mode has always cleared them; light mode
+   needs the same or the backdrop renders and is never seen. */
+[data-theme="light"] .dashboard-shell,
+[data-theme="light"] .login-page,
+[data-theme="light"] .share-gate { background: transparent; }
+
+/* The board keeps a tint so cards stay readable over it, but thin enough to read through. */
+[data-theme="light"] .trello-shell { background-color: color-mix(in srgb, var(--canvas) 62%, transparent); }
 
 html[data-theme="dark"] { background: #07070f; }
 [data-theme="dark"] body { background: transparent; }

@@ -186,7 +186,46 @@ async function migrate(driver: Driver) {
   await driver.exec(INDEXES);
   await backfillShareCodes(driver, "boards");
   await backfillShareCodes(driver, "cards");
-  await seedAdminInstructor(driver);
+}
+
+/**
+ * Bump this whenever anything above changes shape — a new table, a new entry in ADDED_COLUMNS, a
+ * new index. It is what tells a deployment its database is behind, so treat bumping it as part of
+ * the edit rather than an afterthought: forget, and the migration never runs.
+ */
+const SCHEMA_VERSION = 1;
+
+const META_TABLE = "CREATE TABLE IF NOT EXISTS schema_meta (id INTEGER PRIMARY KEY, version INTEGER NOT NULL)";
+
+/**
+ * The current version, or 0 if it cannot be established.
+ *
+ * Only safe to call outside a transaction. Reading a table that does not exist yet is an error,
+ * and in Postgres an error inside a transaction poisons every statement after it, so the path that
+ * runs under the lock creates the table first instead of relying on this.
+ */
+async function probeSchemaVersion(driver: Driver) {
+  try {
+    const rows = await driver.all("SELECT version FROM schema_meta WHERE id = 1", []);
+    return (rows[0] as { version: number } | undefined)?.version ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+async function readSchemaVersionLocked(driver: Driver) {
+  await driver.exec(META_TABLE);
+  const rows = await driver.all("SELECT version FROM schema_meta WHERE id = 1", []);
+  return (rows[0] as { version: number } | undefined)?.version ?? 0;
+}
+
+async function stampSchemaVersion(driver: Driver) {
+  await driver.exec(META_TABLE);
+  await driver.run(
+    `INSERT INTO schema_meta (id, version) VALUES (1, ?)
+     ON CONFLICT (id) DO UPDATE SET version = excluded.version`,
+    [SCHEMA_VERSION],
+  );
 }
 
 /**
@@ -203,15 +242,34 @@ async function migrate(driver: Driver) {
  * lock then survives on the original backend, blocking every later cold start until that backend
  * is terminated. A transaction is pinned to one backend for its whole life, and
  * pg_advisory_xact_lock is released by COMMIT, so none of the three can happen.
+ *
+ * The version check in front of all that is what keeps a cold start cheap. migrate() is idempotent
+ * but not free — a dozen CREATE TABLE IF NOT EXISTS, fifteen information_schema probes, a page of
+ * CREATE INDEX IF NOT EXISTS and two backfill scans — and every cold start used to pay for all of
+ * it just to discover nothing had changed. An up-to-date database now answers in one round trip.
+ * The check is repeated inside the lock because two instances can both read the old version before
+ * either takes it, and the second must not redo the work.
+ *
+ * Seeding the admin stays outside the version gate. It is one indexed lookup, and it is the
+ * documented way back in when every admin account has been removed — putting it behind the gate
+ * would quietly close that door.
  */
 export async function applySchema(driver: Driver) {
-  if (driver.dialect !== "postgres") return migrate(driver);
-
-  const LOCK_KEY = 8_147_326_155; // arbitrary but stable, namespaced to this app
-  await driver.transaction(async () => {
-    await driver.exec(`SELECT pg_advisory_xact_lock(${LOCK_KEY})`);
-    await migrate(driver);
-  });
+  if ((await probeSchemaVersion(driver)) < SCHEMA_VERSION) {
+    if (driver.dialect !== "postgres") {
+      await migrate(driver);
+      await stampSchemaVersion(driver);
+    } else {
+      const LOCK_KEY = 8_147_326_155; // arbitrary but stable, namespaced to this app
+      await driver.transaction(async () => {
+        await driver.exec(`SELECT pg_advisory_xact_lock(${LOCK_KEY})`);
+        if ((await readSchemaVersionLocked(driver)) >= SCHEMA_VERSION) return;
+        await migrate(driver);
+        await stampSchemaVersion(driver);
+      });
+    }
+  }
+  await seedAdminInstructor(driver);
 }
 
 // Bootstrap a super-admin from env so the very first login works without a pre-seeded database.
