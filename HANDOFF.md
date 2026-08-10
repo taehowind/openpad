@@ -58,12 +58,16 @@ violates the following Content Security Policy directive: "connect-src 'self'".
 
 ## 배포 시 결정된 것
 
-- **전용 DB 역할 `openpad_app`** 을 만들어 씁니다 (`postgres` 슈퍼유저 아님). 풀러 사용자명은
-  `openpad_app.<project-ref>` 형식입니다. 이게 보안상 중요한 이유는 아래 RLS 항목 참고.
-- 풀러 호스트는 `aws-0-ap-southeast-1.pooler.supabase.com:6543` (aws-1 은 이 테넌트를 거부).
-  `db.<ref>.supabase.co` 는 IPv4 로 해석되지 않으므로 직결은 불가.
+- **`postgres` 슈퍼유저 대신 전용 DB 역할**을 만들어 씁니다. 풀러 사용자명은 `<역할>.<project-ref>`
+  형식입니다. 이게 보안상 중요한 이유는 아래 RLS 항목 참고.
+  (실제 역할명은 이 문서에 적지 않습니다. project-ref 는 앱의 CSP 헤더로 공개될 수밖에 없으므로,
+  둘을 함께 적으면 DB 사용자명이 완성되어 비밀번호만 남습니다. 값은 Vercel 환경 변수의
+  `DATABASE_URL` 에 있습니다.)
+- 풀러는 프로젝트 리전의 **Transaction pooler** 주소, 포트 `6543` 입니다. 리전마다 `aws-0` /
+  `aws-1` 두 테넌트 그룹이 있고 프로젝트마다 하나만 받아주므로, Supabase 대시보드가 주는
+  연결 문자열을 그대로 쓰세요. `db.<ref>.supabase.co` 는 IPv4 로 해석되지 않아 직결은 불가.
 - **Supabase 어드바이저의 "RLS 비활성화(critical)" 경고는 이 구성에서는 오탐입니다.** 테이블
-  소유자가 `openpad_app` 이라 Supabase 의 기본 권한 부여(`postgres` 소유)가 적용되지 않아
+  소유자가 전용 역할이라 Supabase 의 기본 권한 부여(`postgres` 소유)가 적용되지 않아
   `anon`/`authenticated` 는 14개 테이블 전부에 권한이 없습니다. PostgREST 로 확인 시 읽기·쓰기
   모두 `401 permission denied`. **반대로 `postgres` 슈퍼유저로 붙였다면 진짜 구멍이었습니다** —
   그 경우 publishable 키만으로 `instructors` 의 비밀번호 해시와 전 보드의 `share_token` 이 읽힙니다.
