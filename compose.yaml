@@ -1,0 +1,31 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # Default matches the existing deployment; override APP_NAME for a fresh install.
+    container_name: ${APP_NAME:-ewp-aiwall}-app
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      SESSION_SECRET: ${SESSION_SECRET}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      SQLITE_PATH: /data/aistudy.sqlite
+      UPLOAD_DIR: /data/uploads
+    # Bound to loopback: put a reverse proxy in front and terminate TLS there.
+    ports:
+      - "${BIND_ADDR:-127.0.0.1}:${PORT:-7400}:3000"
+    volumes:
+      - ewp_data:/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+
+volumes:
+  # Deliberately still named ewp_data: renaming it would point an existing deployment at a new,
+  # empty volume and orphan its database. New deployments just get an empty one either way.
+  ewp_data:
