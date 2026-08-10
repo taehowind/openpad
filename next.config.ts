@@ -1,5 +1,22 @@
 import type { NextConfig } from "next";
 
+/**
+ * Where the browser uploads attachments directly, that origin has to be reachable from the page.
+ * Serverless caps request bodies at 4.5MB, under our 10MB attachment limit, so on object storage
+ * the bytes only ever travel browser -> bucket (see src/lib/storage.ts and BoardClient's
+ * attachFile). With `connect-src 'self'` alone the browser blocks that PUT outright and large
+ * attachments cannot be uploaded at all.
+ *
+ * Only the configured bucket host is allowed, and only when one is configured, so a self-hosted
+ * deployment — which uploads through the API and needs no such exception — keeps the tighter
+ * policy. Headers are baked in at build time, so changing SUPABASE_URL needs a redeploy.
+ */
+const storageOrigin = (() => {
+  const raw = process.env.SUPABASE_URL?.trim();
+  if (!raw) return null;
+  try { return new URL(raw).origin; } catch { return null; }
+})();
+
 // Next injects inline bootstrap/hydration scripts and Tailwind ships inline styles, so those two
 // directives must stay permissive. Everything else is locked down: no third-party scripts, no
 // plugins, no <base> hijacking, and forms can only post back to us.
@@ -9,7 +26,7 @@ const appCsp = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
-  "connect-src 'self'",
+  `connect-src 'self'${storageOrigin ? ` ${storageOrigin}` : ""}`,
   // Gallery works are same-origin documents shown in an iframe; each carries its own sandbox CSP.
   "frame-src 'self'",
   "object-src 'none'",
