@@ -42,6 +42,12 @@ export function AdminClient() {
   const [qrBoard, setQrBoard] = useState<BoardSummary | null>(null);
   const [membersOpen, setMembersOpen] = useState(false);
   const [members, setMembers] = useState<InstructorListItem[]>([]);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileName, setProfileName] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [profileError, setProfileError] = useState("");
   const [createAudience, setCreateAudience] = useState<BoardAudience>("link");
   const [createBackground, setCreateBackground] = useState<BoardBackground>("default");
   const [createType, setCreateType] = useState<BoardType>("board");
@@ -87,6 +93,49 @@ export function AdminClient() {
 
   async function refreshBoards() {
     await runAction("보드 목록을 새로고침하는 중…", "보드 목록을 새로고침했습니다.", "보드 목록을 불러오지 못했습니다.", loadBoards);
+  }
+
+  function openProfile() {
+    setProfileName(account?.name ?? "");
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setProfileError("");
+    setProfileOpen(true);
+  }
+
+  async function saveProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setProfileError("");
+    const name = profileName.trim();
+    if (!name) { setProfileError("이름을 입력해 주세요."); return; }
+    // Leaving all three password fields empty means "name only", which is a normal way to use
+    // this form rather than a mistake.
+    const changingPassword = Boolean(currentPassword || newPassword || confirmPassword);
+    if (changingPassword) {
+      if (!currentPassword) { setProfileError("현재 비밀번호를 입력해 주세요."); return; }
+      if (newPassword.length < 8) { setProfileError("새 비밀번호는 8자 이상이어야 합니다."); return; }
+      if (newPassword !== confirmPassword) { setProfileError("새 비밀번호가 서로 다릅니다."); return; }
+    }
+    if (name === account?.name && !changingPassword) { setProfileError("변경할 내용이 없습니다."); return; }
+
+    setBusy(true);
+    const saved = await runAction("내 정보를 저장하는 중…", "내 정보를 저장했습니다.", "내 정보를 저장하지 못했습니다.", async () => {
+      const response = await fetch("/api/instructors/me", {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, ...(changingPassword ? { currentPassword, newPassword } : {}) }),
+      });
+      if (!response.ok) throw new Error(await responseError(response, "내 정보를 저장하지 못했습니다."));
+      return (await response.json()).account as AccountInfo;
+    });
+    setBusy(false);
+    if (!saved) { setProfileError(""); return; }
+    setAccount(saved);
+    setProfileOpen(false);
+    // The name is copied onto member-authored cards, so the dashboard's own counts and any open
+    // member list can be stale now.
+    await loadBoards();
+    if (membersOpen) await loadMembers();
   }
 
   async function copyShareLink(board: BoardSummary) {
@@ -333,7 +382,7 @@ export function AdminClient() {
               {notice && <p className="form-error" style={{ background: "var(--ok-surface)", color: "var(--ok)", borderColor: "transparent" }} role="status">{notice}</p>}
               <label><span>이메일</span><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" autoFocus required /></label>
               <label><span>비밀번호</span><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required /></label>
-              <label className="remember-row"><input type="checkbox" checked={rememberEmail} onChange={(event) => setRememberEmail(event.target.checked)} /><span>이메일 저장</span></label>
+              <label className="checkbox-row"><input type="checkbox" checked={rememberEmail} onChange={(event) => setRememberEmail(event.target.checked)} /><span>이메일 저장</span></label>
               {error && <p className="form-error" role="alert">{error}</p>}
               <button className="primary-button" disabled={busy}>{busy ? "확인 중…" : "로그인"}<ChevronRight size={18} /></button>
               <p className="auth-switch">아직 강사 계정이 없나요? <button type="button" onClick={() => { setAuthMode("signup"); setError(""); setNotice(""); }}>회원가입</button></p>
@@ -362,7 +411,11 @@ export function AdminClient() {
       <header className="topbar">
         <Brand compact />
         <div className="topbar-actions">
-          {account && <span className="account-chip"><b>{account.name}</b>{account.role === "admin" && <span className="role-tag">관리자</span>}</span>}
+          {account && (
+            <button type="button" className="account-chip" onClick={openProfile} title="내 정보 수정" aria-label={`내 정보 수정 (${account.name})`}>
+              <b>{account.name}</b>{account.role === "admin" && <span className="role-tag">관리자</span>}
+            </button>
+          )}
           {account?.role === "admin" && <button className="topbar-button" onClick={() => void openMembers()}><Users size={16} /> 회원 관리</button>}
           <button className="topbar-button" onClick={() => void refreshBoards()}><RefreshCw size={16} /> 새로고침</button>
           <ThemeToggle />
@@ -403,6 +456,31 @@ export function AdminClient() {
           </div>
         )}
       </section>
+
+      {profileOpen && account && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setProfileOpen(false)}>
+          <form className="modal-card" role="dialog" aria-modal="true" aria-labelledby="profile-title" onSubmit={saveProfile}>
+            <button type="button" className="modal-close" aria-label="내 정보 창 닫기" onClick={() => setProfileOpen(false)}><X size={18} /></button>
+            <span className="kicker">MY ACCOUNT</span><h2 id="profile-title">내 정보</h2>
+            <p>이름과 비밀번호를 바꿀 수 있습니다. 비밀번호를 그대로 두려면 아래 세 칸을 비워 두세요.</p>
+            <div className="field"><span>이메일</span><p className="field-static">{account.email}<em>변경할 수 없습니다</em></p></div>
+            <label><span>이름</span>
+              <input type="text" value={profileName} onChange={(event) => setProfileName(event.target.value)} maxLength={60} autoFocus required />
+            </label>
+            <label><span>현재 비밀번호</span>
+              <input type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} autoComplete="current-password" placeholder="비밀번호를 바꿀 때만 입력" />
+            </label>
+            <label><span>새 비밀번호 (8자 이상)</span>
+              <input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} autoComplete="new-password" minLength={8} placeholder="비우면 그대로 둡니다" />
+            </label>
+            <label><span>새 비밀번호 확인</span>
+              <input type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} autoComplete="new-password" placeholder="새 비밀번호를 한 번 더" />
+            </label>
+            {profileError && <p className="form-error" role="alert">{profileError}</p>}
+            <button className="primary-button" disabled={busy}>{busy ? "저장하는 중…" : "저장"}<ChevronRight size={18} /></button>
+          </form>
+        </div>
+      )}
 
       {createOpen && (
         <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setCreateOpen(false)}>

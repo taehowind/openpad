@@ -11,7 +11,7 @@ const instructorMaxAge = 60 * 60 * 12;
 const participantMaxAge = 60 * 60 * 24 * 30;
 const deviceMaxAge = 60 * 60 * 24 * 365;
 
-export type InstructorSession = { id: string; role: InstructorRole; name: string };
+export type InstructorSession = { id: string; role: InstructorRole; name: string; email: string };
 
 export type ParticipantSession = {
   participantId: string;
@@ -102,7 +102,9 @@ export async function getInstructorSession(): Promise<InstructorSession | null> 
   if (payload?.typ !== "instructor" || typeof payload.id !== "string") return null;
   const instructor = (await getInstructorById(payload.id));
   if (!instructor || instructor.status !== "active") return null;
-  return { id: instructor.id, role: instructor.role, name: instructor.name };
+  // email is part of the session because AccountInfo promises it: without it /api/auth/me returned
+  // an account whose email was undefined after a refresh, while the login response had it.
+  return { id: instructor.id, role: instructor.role, name: instructor.name, email: instructor.email };
 }
 
 export async function getParticipantSession(): Promise<ParticipantSession | null> {

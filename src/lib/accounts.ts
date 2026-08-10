@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { all, get, run } from "@/lib/db";
+import { all, get, run, transaction } from "@/lib/db";
 import { hashPassword, verifyPassword } from "@/lib/password";
 
 export type InstructorRole = "admin" | "instructor";
@@ -87,6 +87,67 @@ export async function updateInstructor(id: string, changes: { status?: Instructo
     changes.status ?? null, changes.role ?? null, now(), id,
   ));
   return { ok: true as const };
+}
+
+/**
+ * Self-service edit of one's own name and password. Separate from updateInstructor, which is the
+ * admin's tool for role and status — the two answer to different rules and should not share a path.
+ *
+ * Changing the password always costs the current one. The session outlives the change either way:
+ * the cookie carries no password material, and there is no token version to bump, so other devices
+ * stay signed in. That is a known gap, noted in the design doc.
+ */
+export async function updateOwnProfile(
+  id: string,
+  changes: { name?: string; currentPassword?: string; newPassword?: string },
+): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
+  const instructor = (await getInstructorById(id));
+  if (!instructor) return { ok: false, status: 404, error: "계정을 찾을 수 없습니다." };
+
+  const name = changes.name?.trim();
+  const wantsPassword = Boolean(changes.newPassword);
+  if (!name && !wantsPassword) return { ok: false, status: 400, error: "변경할 내용을 입력해 주세요." };
+
+  let passwordHash: string | null = null;
+  if (wantsPassword) {
+    if (!verifyPassword(changes.currentPassword ?? "", instructor.password_hash)) {
+      return { ok: false, status: 403, error: "현재 비밀번호가 올바르지 않습니다." };
+    }
+    passwordHash = hashPassword(changes.newPassword!);
+  }
+
+  const timestamp = now();
+  await transaction(async () => {
+    (await run(
+      "UPDATE instructors SET name = COALESCE(?, name), password_hash = COALESCE(?, password_hash), updated_at = ? WHERE id = ?",
+      name ?? null, passwordHash, timestamp, id,
+    ));
+    if (name && name !== instructor.name) await renameAuthoredContent(id, name, timestamp);
+  });
+  return { ok: true };
+}
+
+/**
+ * Carries a new name across the places it was copied to when the content was written.
+ *
+ * Only content written as a *member* is affected. On a board they manage, an instructor writes as
+ * the teacher actor, whose stored name is the literal "강사" rather than theirs — nothing to rename
+ * there. Elsewhere they get a participant row keyed `ins:<id>`, and that is what ties rows back to
+ * a person; there is no foreign key to follow.
+ *
+ * audit_logs and board_revisions keep the old name on purpose: they record who did what at a
+ * point in time, and rewriting them afterwards would empty them of their value. presence is left
+ * alone too — the heartbeat rewrites it within 30 seconds.
+ */
+async function renameAuthoredContent(instructorId: string, name: string, timestamp: string) {
+  const deviceKey = `ins:${instructorId}`;
+  const mine = (await all<{ id: string }>("SELECT id FROM participants WHERE device_id = ?", deviceKey));
+  (await run("UPDATE participants SET nickname = ?, updated_at = ? WHERE device_id = ?", name, timestamp, deviceKey));
+  for (const { id } of mine) {
+    await run("UPDATE cards SET author_name = ? WHERE participant_id = ?", name, id);
+    await run("UPDATE comments SET author_name = ? WHERE participant_id = ?", name, id);
+    await run("UPDATE chat_messages SET author_name = ? WHERE participant_id = ?", name, id);
+  }
 }
 
 export async function deleteInstructor(id: string) {
