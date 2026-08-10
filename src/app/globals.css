@@ -984,12 +984,99 @@ body:has(.modal-backdrop), body:has(.side-panel-backdrop) { overflow: hidden; }
     linear-gradient(to bottom, rgba(3, 4, 12, .22), rgba(3, 4, 12, .44));
 }
 
+/* ============================================================
+   Light mode — the same layers, read as a daylit page
+
+   The constraint here is the opposite of dark mode's. There the backdrop is the design and the
+   panels are glass over it; here the panels are opaque white on warm paper, so the backdrop is
+   only ever glimpsed in the gutters between cards. Anything with real contrast would read as
+   dirt on the page rather than atmosphere, so every layer is pale and slow: washes of colour
+   bleeding across the sheet, one soft shaft of light, and dust drifting through it.
+
+   Same keyframes as dark mode, so this costs no extra animation work — only different paint.
+   ============================================================ */
+[data-theme="light"] .skyscape {
+  position: fixed; z-index: -1; inset: 0; display: block; overflow: hidden;
+  pointer-events: none; contain: strict;
+  background:
+    radial-gradient(130% 95% at 50% -10%, #fbf8f2 0%, var(--canvas) 52%, #eae4da 100%),
+    var(--canvas);
+}
+
+/* --- Colour washes: watercolour bleeding into paper, not clouds in a sky --- */
+[data-theme="light"] .sky-wash { position: absolute; inset: 0; }
+[data-theme="light"] .wash {
+  position: absolute; display: block; border-radius: 50%;
+  filter: blur(100px); will-change: transform;
+}
+[data-theme="light"] .w-1 { top: -18%; left: -8%; width: 48vmax; height: 48vmax; opacity: .5; background: radial-gradient(circle at 40% 38%, #f2d3b4, transparent 68%); animation: wash-a 74s ease-in-out infinite; }
+[data-theme="light"] .w-2 { bottom: -22%; right: -10%; width: 44vmax; height: 44vmax; opacity: .42; background: radial-gradient(circle at 58% 46%, #cddcea, transparent 68%); animation: wash-b 92s ease-in-out infinite; }
+[data-theme="light"] .w-3 { top: 26%; left: 40%; width: 36vmax; height: 36vmax; opacity: .34; background: radial-gradient(circle at 50% 50%, #d8e6d4, transparent 70%); animation: wash-a 112s ease-in-out infinite reverse; }
+
+/* --- A shaft of light raked across the page, where dark mode has the milky way --- */
+[data-theme="light"] .sky-band {
+  position: absolute; top: -30%; left: -20%; width: 140%; height: 160%;
+  transform: rotate(-24deg);
+  background: linear-gradient(to bottom, transparent 36%, rgba(255, 252, 244, .5) 46%, rgba(255, 255, 255, .72) 50%, rgba(255, 252, 244, .5) 54%, transparent 64%);
+  filter: blur(26px);
+  animation: band-breathe 40s ease-in-out infinite;
+}
+
+/* --- Dust in the light. Same parallax rig as the stars, bigger and far fainter specks. --- */
+[data-theme="light"] .sky-drift { position: absolute; inset: 0; perspective: 800px; transform-style: preserve-3d; }
+[data-theme="light"] .drift-field {
+  position: absolute; inset: -30%;
+  background-repeat: repeat;
+  will-change: transform, opacity;
+}
+[data-theme="light"] .field-far {
+  background-image:
+    radial-gradient(2px 2px at 22px 40px, rgba(150, 132, 104, .3), transparent),
+    radial-gradient(2px 2px at 128px 96px, rgba(126, 142, 158, .26), transparent),
+    radial-gradient(2px 2px at 232px 188px, rgba(150, 132, 104, .24), transparent),
+    radial-gradient(2px 2px at 76px 244px, rgba(138, 150, 128, .24), transparent),
+    radial-gradient(2px 2px at 286px 58px, rgba(150, 132, 104, .22), transparent);
+  background-size: 340px 340px;
+  animation: drift-far 240s linear infinite, mote-far 11s ease-in-out infinite;
+}
+[data-theme="light"] .field-mid {
+  background-image:
+    radial-gradient(2.5px 2.5px at 54px 74px, rgba(146, 124, 92, .34), transparent),
+    radial-gradient(2.5px 2.5px at 198px 26px, rgba(120, 138, 158, .3), transparent),
+    radial-gradient(2.5px 2.5px at 106px 210px, rgba(146, 124, 92, .28), transparent),
+    radial-gradient(2.5px 2.5px at 258px 142px, rgba(134, 148, 124, .28), transparent);
+  background-size: 300px 300px;
+  animation: drift-mid 150s linear infinite, mote-mid 8s ease-in-out infinite;
+}
+[data-theme="light"] .field-near {
+  background-image:
+    radial-gradient(3.5px 3.5px at 90px 130px, rgba(140, 116, 84, .3), transparent),
+    radial-gradient(3.5px 3.5px at 268px 62px, rgba(112, 132, 154, .26), transparent),
+    radial-gradient(3px 3px at 176px 250px, rgba(140, 116, 84, .24), transparent);
+  background-size: 380px 380px;
+  animation: drift-near 90s linear infinite, mote-near 6s ease-in-out infinite;
+}
+
+/* Motes fade in and out of the light rather than twinkling — a shallower swing than the stars. */
+@keyframes mote-far { 0%, 100% { opacity: .7; } 50% { opacity: .45; } }
+@keyframes mote-mid { 0%, 100% { opacity: .6; } 40% { opacity: .85; } }
+@keyframes mote-near { 0%, 100% { opacity: .8; } 55% { opacity: .55; } }
+
+/* Meteors stay a night thing: a shooting star at midday reads as a glitch, not a flourish. */
+[data-theme="light"] .sky-streaks { display: none; }
+
+/* Lifts the edges towards paper white so the washes cannot pool into something that looks like a
+   stain in the corners. The middle is left clear on purpose — veiling it too would flatten the
+   colour back out and leave the motion invisible, which is the failure mode here. */
+[data-theme="light"] .sky-veil {
+  position: absolute; inset: 0;
+  background: radial-gradient(118% 88% at 50% 30%, transparent 0%, rgba(255, 254, 250, .34) 74%, rgba(255, 254, 250, .58) 100%);
+}
+
 /* Decoration only — hold it still when the visitor asks for less motion. */
 @media (prefers-reduced-motion: reduce) {
-  [data-theme="dark"] .wash,
-  [data-theme="dark"] .sky-band,
-  [data-theme="dark"] .drift-field { animation: none; }
-  [data-theme="dark"] .streak { display: none; }
+  .wash, .sky-band, .drift-field { animation: none; }
+  .streak { display: none; }
 }
 
 /* ============================================================
@@ -1005,6 +1092,13 @@ body:has(.modal-backdrop), body:has(.side-panel-backdrop) { overflow: hidden; }
    ============================================================ */
 
 /* Let the fixed backdrop show: the root paints the base colour, everything above is see-through. */
+/* The page colour belongs on <html> in both themes so <body> can be transparent and let the
+   backdrop through. Light mode also works with the colour left on <body>, but only by background
+   propagation — which stops the moment anything gives <html> a colour of its own, and takes the
+   backdrop with it. Being explicit costs a line and removes the trapdoor. */
+html[data-theme="light"] { background: var(--canvas); }
+[data-theme="light"] body { background: transparent; }
+
 html[data-theme="dark"] { background: #07070f; }
 [data-theme="dark"] body { background: transparent; }
 [data-theme="dark"] .dashboard-shell,
