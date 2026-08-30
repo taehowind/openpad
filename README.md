@@ -6,6 +6,8 @@
 > A Padlet-style collaboration board for classrooms. Self-host it with Docker, or deploy it to
 > Vercel + Supabase. Same codebase either way — see [Deploying](#deploying).
 
+**주식회사 와이주(Whyzoo Inc.)가 개발·운영하는 제품입니다.**
+
 ## 주요 기능
 
 - 강사 계정(가입 → 관리자 승인)과 다중 보드 관리
@@ -90,6 +92,10 @@ npm run build    # 프로덕션 빌드
 - 업로드된 HTML 은 `sandbox` CSP 로 격리된 오리진에서 제공되어, 우리 쿠키나 DOM 에 접근할 수
   없습니다.
 
-## 라이선스
+## 라이선스 및 저작권
 
-[Apache License 2.0](LICENSE) — 상업적 이용, 수정, 재배포가 가능합니다.
+openPad(AI STUDY)는 **주식회사 와이주(Whyzoo Inc.)** 의 제품입니다.
+Copyright 2026 주식회사 와이주 (Whyzoo Inc.)
+
+[Apache License 2.0](LICENSE) 으로 배포합니다 — 상업적 이용, 수정, 재배포가 가능합니다.
+재배포 시 [NOTICE](NOTICE) 파일을 함께 포함해 주세요(라이선스 4조).

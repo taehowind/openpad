@@ -4,9 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 @AGENTS.md
 
+## Product
+
+openPad (AI STUDY) is a product of **주식회사 와이주 (Whyzoo Inc.)**, Copyright 2026, released under
+the Apache License 2.0. Keep the attribution in `NOTICE`, `LICENSE`, `README.md` and `package.json`
+in step with any rebrand — `NOTICE` is the one the licence actually requires redistributors to carry.
+
 ## Overview
 
-AI STUDY — a Trello-style shared board (`ewp` / "aiwall") for lectures to 한국동서발전 협력사 임직원. A single **teacher/admin** manages multiple boards; **guests** (수강생) join through an unguessable share link, get an emoji + nickname profile, and post cards, comments, and Q&A chat. All state is server-rendered and persisted in a local SQLite file plus an uploads directory — no external services.
+AI STUDY — a Trello-style shared board (`ewp` / "aiwall") for lectures to 한국동서발전 협력사 임직원. A single **teacher/admin** manages multiple boards; **guests** (수강생) join through an unguessable share link, get an emoji + nickname profile, and post cards, comments, and Q&A chat. Everything is server-rendered; state lives either in a local SQLite file plus an uploads directory (self-hosting) or in Postgres plus object storage (Supabase behind Vercel) — see the data layer below.
 
 ## Runtime & stack (read before writing code)
 
