@@ -16,12 +16,34 @@ function chatTime(value: string) {
   return new Intl.DateTimeFormat("ko-KR", { hour: "2-digit", minute: "2-digit" }).format(new Date(value));
 }
 
+/**
+ * Below this width there is no room for the panel beside the board, so the stylesheet lifts it out
+ * of the flow and docks it to the bottom of the viewport. Kept in step with the same breakpoint in
+ * globals.css — the two describe one behaviour.
+ */
+const OVERLAY_WIDTH = "(max-width: 920px)";
+
+const isOverlayWidth = () => typeof window !== "undefined" && window.matchMedia(OVERLAY_WIDTH).matches;
+
 export function BoardChat({ messages, onSend, canModerate = false, onHide, onDelete }: BoardChatProps) {
   const [content, setContent] = useState("");
   const [busy, setBusy] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
+  // Narrow viewports start collapsed. Expanded, the panel covers the board it is meant to
+  // accompany, and opening on top of the cards is not what someone arriving at a board wants.
+  // Safe to read the media query during the first render: this component only mounts once the
+  // board payload has arrived on the client, so there is no server render to disagree with.
+  const [collapsed, setCollapsed] = useState(isOverlayWidth);
   const [seenCount, setSeenCount] = useState(messages.length);
   const listRef = useRef<HTMLDivElement>(null);
+
+  // Collapse on the way *into* overlay width, not while already there — re-collapsing on every
+  // resize event would fight someone who has deliberately opened it.
+  useEffect(() => {
+    const query = window.matchMedia(OVERLAY_WIDTH);
+    const onChange = (event: MediaQueryListEvent) => { if (event.matches) setCollapsed(true); };
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
