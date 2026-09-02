@@ -1,5 +1,6 @@
-import { promises as fs } from "node:fs";
+import { createReadStream, promises as fs } from "node:fs";
 import path from "node:path";
+import { Readable } from "node:stream";
 import { logError } from "@/lib/log";
 
 /**
@@ -51,6 +52,41 @@ export async function readUpload(storedName: string): Promise<Buffer> {
  * gone either way — but it does leave an object nobody will ever reference again, so it is logged
  * rather than dropped. Silent failures here are how a bucket fills with orphans.
  */
+/**
+ * Opens an upload for streaming, or null if there is no such object.
+ *
+ * readUpload pulls the whole file into memory, which is fine for the gallery's 5MB HTML and wrong
+ * for a 100MB teacher attachment: on serverless that is 100MB of function memory held for the
+ * length of the download, per concurrent reader. This hands back a stream instead, so the bytes
+ * pass through rather than pile up.
+ *
+ * Absent and broken are different answers. A missing object returns null — the reader asked for
+ * something that is not there — while a backend that failed throws, because that is ours to fix
+ * and the caller should say so rather than claim the file never existed.
+ */
+export type UploadStream = { body: ReadableStream<Uint8Array>; size: number | null };
+
+export async function openUpload(storedName: string): Promise<UploadStream | null> {
+  if (!isObjectStorage()) {
+    const target = uploadPath(storedName);
+    let size: number;
+    try {
+      size = (await fs.stat(target)).size;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+      throw error;
+    }
+    return { body: Readable.toWeb(createReadStream(target)) as ReadableStream<Uint8Array>, size };
+  }
+
+  const response = await fetch(objectUrl(storedName), { headers: serviceHeaders(), cache: "no-store" });
+  // Supabase answers a missing object with 400 as readily as 404, so both mean "not there".
+  if (response.status === 404 || response.status === 400) return null;
+  if (!response.ok || !response.body) throw new Error(`storage read failed: ${response.status}`);
+  const declared = Number(response.headers.get("content-length"));
+  return { body: response.body, size: Number.isFinite(declared) && declared > 0 ? declared : null };
+}
+
 export async function removeUpload(storedName: string) {
   if (!isObjectStorage()) {
     await fs.unlink(uploadPath(storedName)).catch((error) => {

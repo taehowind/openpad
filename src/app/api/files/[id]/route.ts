@@ -4,7 +4,7 @@ import { getBoardById } from "@/lib/board-data";
 import { get } from "@/lib/db";
 import { apiError } from "@/lib/http";
 import { logError } from "@/lib/log";
-import { isInlineViewable, readUpload, safeMimeType } from "@/lib/storage";
+import { isInlineViewable, openUpload, safeMimeType } from "@/lib/storage";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -21,24 +21,31 @@ export async function GET(_: Request, context: Context) {
     && Boolean((await get("SELECT 1 FROM participants WHERE id = ? AND board_id = ?", participant.participantId, file.board_id)));
   const allowed = (board && (await canManageBoard(board, session))) || stillEnrolled;
   if (!allowed) return apiError("파일 접근 권한이 없습니다.", 403);
+  // Streamed rather than read into memory first: a teacher may attach up to 100MB, and buffering
+  // that holds the whole file in the function for as long as the download takes, once per reader.
+  let upload;
   try {
-    const data = await readUpload(file.stored_name);
-    // The uploader controls mime_type, so it is validated first and anything off the inline
-    // allowlist is forced to download — an uploaded .html or .svg must never render here.
-    const mimeType = safeMimeType(file.mime_type);
-    const inline = isInlineViewable(mimeType);
-    return new Response(new Uint8Array(data), {
-      headers: {
-        "Content-Type": mimeType,
-        "Content-Length": String(data.byteLength),
-        "Content-Disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(file.original_name)}`,
-        "Content-Security-Policy": "sandbox;",
-        "Cache-Control": "private, max-age=300",
-        "X-Content-Type-Options": "nosniff",
-      },
-    });
+    upload = await openUpload(file.stored_name);
   } catch (error) {
     logError("files.read", error, { fileId: id, storedName: file.stored_name });
     return apiError("파일을 불러올 수 없습니다.", 502);
   }
+  // The row says there is a file but the store disagrees — a genuine 404 for the reader.
+  if (!upload) return apiError("파일을 찾을 수 없습니다.", 404);
+
+  // The uploader controls mime_type, so it is validated first and anything off the inline
+  // allowlist is forced to download — an uploaded .html or .svg must never render here.
+  const mimeType = safeMimeType(file.mime_type);
+  const inline = isInlineViewable(mimeType);
+  return new Response(upload.body, {
+    headers: {
+      "Content-Type": mimeType,
+      // Only when the store told us; a wrong length is worse than none.
+      ...(upload.size !== null ? { "Content-Length": String(upload.size) } : {}),
+      "Content-Disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(file.original_name)}`,
+      "Content-Security-Policy": "sandbox;",
+      "Cache-Control": "private, max-age=300",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
 }
