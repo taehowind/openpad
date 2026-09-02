@@ -1,6 +1,7 @@
 import { canViewBoardContent } from "@/lib/access";
 import { getBoardById } from "@/lib/board-data";
 import { get } from "@/lib/db";
+import { logError } from "@/lib/log";
 import { readUpload } from "@/lib/storage";
 
 // Uploaded student HTML runs with an opaque origin (no allow-same-origin), so it can never read
@@ -32,7 +33,8 @@ export async function serveGalleryWork(card: GalleryCard | undefined) {
         "Cache-Control": "private, max-age=60",
       },
     });
-  } catch {
-    return textResponse("작품을 불러올 수 없습니다.", 404);
+  } catch (error) {
+    logError("gallery.read", error, { cardId: card.id, storedName: file.stored_name });
+    return textResponse("작품을 불러올 수 없습니다.", 502);
   }
 }

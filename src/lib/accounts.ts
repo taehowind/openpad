@@ -36,9 +36,14 @@ export async function getInstructorByEmail(email: string) {
   return (await get<InstructorRow>("SELECT * FROM instructors WHERE email = ?", email.trim().toLowerCase()));
 }
 
-export async function createInstructor(input: { email: string; name: string; password: string }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+/**
+ * Creates a pending instructor. "Already registered" comes back as a reason code rather than a
+ * message, because the caller must decide whether saying so out loud is safe — see the signup
+ * route, where it is not.
+ */
+export async function createInstructor(input: { email: string; name: string; password: string }): Promise<{ ok: true; id: string } | { ok: false; reason: "duplicate" }> {
   const email = input.email.trim().toLowerCase();
-  if ((await getInstructorByEmail(email))) return { ok: false, error: "이미 가입된 이메일입니다." };
+  if ((await getInstructorByEmail(email))) return { ok: false, reason: "duplicate" };
   const id = randomUUID();
   const timestamp = now();
   (await run(

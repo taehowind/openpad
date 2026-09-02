@@ -14,7 +14,11 @@ export async function POST(request: Request) {
   if (await rateLimitedShared(`signup:${ip}`, 6, 30 * 60_000)) return apiError("가입 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.", 429);
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return apiError(parsed.error?.issues?.[0]?.message ?? "가입 정보를 확인해 주세요.");
-  const result = (await createInstructor(parsed.data));
-  if (!result.ok) return apiError(result.error, 409);
+  // Answer the same way whether or not the address is already registered. Replying "이미 가입된
+  // 이메일입니다" turns this endpoint into a way to ask whether a particular person has an account
+  // here, which is worth more to an attacker than it is to the handful of instructors who sign up.
+  // Nothing is lost by staying quiet: every signup waits for an admin to approve it, so "신청이
+  // 접수되었습니다" is what a genuine new applicant sees too.
+  await createInstructor(parsed.data);
   return NextResponse.json({ ok: true, pending: true }, { status: 201 });
 }

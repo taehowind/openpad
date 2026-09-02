@@ -3,6 +3,7 @@ import { getInstructorSession, getParticipantSession } from "@/lib/auth";
 import { getBoardById } from "@/lib/board-data";
 import { get } from "@/lib/db";
 import { apiError } from "@/lib/http";
+import { logError } from "@/lib/log";
 import { isInlineViewable, readUpload, safeMimeType } from "@/lib/storage";
 
 type Context = { params: Promise<{ id: string }> };
@@ -36,7 +37,8 @@ export async function GET(_: Request, context: Context) {
         "X-Content-Type-Options": "nosniff",
       },
     });
-  } catch {
-    return apiError("파일을 불러올 수 없습니다.", 404);
+  } catch (error) {
+    logError("files.read", error, { fileId: id, storedName: file.stored_name });
+    return apiError("파일을 불러올 수 없습니다.", 502);
   }
 }

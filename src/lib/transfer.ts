@@ -94,7 +94,12 @@ export async function transferColumn(
       // Attachments are scoped to a board for access control, so they have to follow the cards
       // or students on the destination board would get a 403 opening them.
       const fileIds = cards.map((card) => card.file_id).filter((id): id is string => !!id);
-      for (const fileId of fileIds) (await run("UPDATE files SET board_id = ? WHERE id = ?", targetBoardId, fileId));
+      // One statement rather than one round trip per attachment. Only the number of placeholders is
+      // computed here — the ids are still bound — so this stays parameterised on both engines.
+      if (fileIds.length > 0) {
+        const slots = fileIds.map(() => "?").join(", ");
+        (await run(`UPDATE files SET board_id = ? WHERE id IN (${slots})`, targetBoardId, ...fileIds));
+      }
       await run("UPDATE boards SET updated_at = ? WHERE id IN (?, ?)", timestamp, column.board_id, targetBoardId);
       await recordAction(column.board_id, actor, "목록을 다른 보드로 옮겼습니다", "column", column.id, { name: column.name });
       await recordAction(targetBoardId, actor, "다른 보드에서 목록을 가져왔습니다", "column", column.id, { name: column.name, cards: cards.length });

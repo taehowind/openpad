@@ -1,5 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { logError } from "@/lib/log";
 
 /**
  * Single source of truth for where uploads live. Two backends:
@@ -45,12 +46,24 @@ export async function readUpload(storedName: string): Promise<Buffer> {
   return Buffer.from(await response.arrayBuffer());
 }
 
+/**
+ * Best-effort delete. Failure is not worth failing the caller's request over — the card is already
+ * gone either way — but it does leave an object nobody will ever reference again, so it is logged
+ * rather than dropped. Silent failures here are how a bucket fills with orphans.
+ */
 export async function removeUpload(storedName: string) {
   if (!isObjectStorage()) {
-    await fs.unlink(uploadPath(storedName)).catch(() => undefined);
+    await fs.unlink(uploadPath(storedName)).catch((error) => {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") logError("storage.remove", error, { storedName });
+    });
     return;
   }
-  await fetch(objectUrl(storedName), { method: "DELETE", headers: serviceHeaders() }).catch(() => undefined);
+  try {
+    const response = await fetch(objectUrl(storedName), { method: "DELETE", headers: serviceHeaders() });
+    if (!response.ok && response.status !== 404) logError("storage.remove", new Error(`status ${response.status}`), { storedName });
+  } catch (error) {
+    logError("storage.remove", error, { storedName });
+  }
 }
 
 /**

@@ -1,4 +1,5 @@
 import { createDriver, type Driver, type SqlValue } from "@/lib/driver";
+import { logError } from "@/lib/log";
 import { applySchema } from "@/lib/schema";
 
 /**
@@ -19,6 +20,7 @@ function connect(): Promise<Driver> {
     return driver;
   })().catch((error) => {
     ready = null; // let the next request retry rather than wedging the process
+    logError("db.connect", error, { dialect: process.env.DATABASE_URL ? "postgres" : "sqlite" });
     throw error;
   });
   return ready;
