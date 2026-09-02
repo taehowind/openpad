@@ -67,8 +67,20 @@ function cookieOptions(maxAge: number) {
   };
 }
 
-export async function setInstructorSession(instructor: { id: string; role: InstructorRole }) {
-  (await cookies()).set(INSTRUCTOR_COOKIE, await sign({ typ: "instructor", id: instructor.id, level: instructor.role }, instructorMaxAge), cookieOptions(instructorMaxAge));
+/**
+ * Issues the instructor cookie, stamped with the account's current token version.
+ *
+ * That stamp is what makes a password change reach other devices. The cookie carries no
+ * password material, so before this there was nothing about it that a password change could
+ * make stale: a session opened on a lost laptop stayed valid for its full lifetime no matter
+ * what the owner did afterwards.
+ */
+export async function setInstructorSession(instructor: { id: string; role: InstructorRole; tokenVersion: number }) {
+  (await cookies()).set(
+    INSTRUCTOR_COOKIE,
+    await sign({ typ: "instructor", id: instructor.id, level: instructor.role, ver: String(instructor.tokenVersion) }, instructorMaxAge),
+    cookieOptions(instructorMaxAge),
+  );
 }
 
 export async function setDeviceIdentity(deviceId: string) {
@@ -102,6 +114,10 @@ export async function getInstructorSession(): Promise<InstructorSession | null> 
   if (payload?.typ !== "instructor" || typeof payload.id !== "string") return null;
   const instructor = (await getInstructorById(payload.id));
   if (!instructor || instructor.status !== "active") return null;
+  // A token minted before the current version belongs to a session the account has since
+  // disowned. Cookies issued before this existed carry no version and read as 0, which is the
+  // column default, so nobody is signed out by the upgrade itself.
+  if (Number(payload.ver ?? 0) !== (instructor.token_version ?? 0)) return null;
   // email is part of the session because AccountInfo promises it: without it /api/auth/me returned
   // an account whose email was undefined after a refresh, while the login response had it.
   return { id: instructor.id, role: instructor.role, name: instructor.name, email: instructor.email };

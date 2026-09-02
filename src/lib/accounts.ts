@@ -12,6 +12,8 @@ export type InstructorRow = {
   password_hash: string;
   role: InstructorRole;
   status: InstructorStatus;
+  /** Incremented on password change; every token stamped with an older value stops working. */
+  token_version: number;
   created_at: string;
   updated_at: string;
 };
@@ -105,7 +107,7 @@ export async function updateInstructor(id: string, changes: { status?: Instructo
 export async function updateOwnProfile(
   id: string,
   changes: { name?: string; currentPassword?: string; newPassword?: string },
-): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
+): Promise<{ ok: true; tokenVersion: number } | { ok: false; status: number; error: string }> {
   const instructor = (await getInstructorById(id));
   if (!instructor) return { ok: false, status: 404, error: "계정을 찾을 수 없습니다." };
 
@@ -121,15 +123,18 @@ export async function updateOwnProfile(
     passwordHash = hashPassword(changes.newPassword!);
   }
 
+  // A new password ends every session that was opened with the old one. The counter goes up in
+  // the same transaction as the hash, so there is no window where one has changed and not the other.
+  const tokenVersion = (instructor.token_version ?? 0) + (wantsPassword ? 1 : 0);
   const timestamp = now();
   await transaction(async () => {
     (await run(
-      "UPDATE instructors SET name = COALESCE(?, name), password_hash = COALESCE(?, password_hash), updated_at = ? WHERE id = ?",
-      name ?? null, passwordHash, timestamp, id,
+      "UPDATE instructors SET name = COALESCE(?, name), password_hash = COALESCE(?, password_hash), token_version = ?, updated_at = ? WHERE id = ?",
+      name ?? null, passwordHash, tokenVersion, timestamp, id,
     ));
     if (name && name !== instructor.name) await renameAuthoredContent(id, name, timestamp);
   });
-  return { ok: true };
+  return { ok: true, tokenVersion };
 }
 
 /**

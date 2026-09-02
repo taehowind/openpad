@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getInstructorById, updateOwnProfile } from "@/lib/accounts";
-import { getInstructorSession } from "@/lib/auth";
+import { getInstructorSession, setInstructorSession } from "@/lib/auth";
 import { apiError, rateLimitedShared } from "@/lib/http";
 
 /**
@@ -45,6 +45,10 @@ export async function PATCH(request: Request) {
   if (!result.ok) return apiError(result.error, result.status);
 
   const updated = (await getInstructorById(session.id));
+  // Changing the password invalidates every token stamped with the old version — including the one
+  // that made this request. Re-stamp it, so the person doing the changing stays signed in here
+  // while every other device is signed out, which is the point of the exercise.
+  if (updated) await setInstructorSession({ id: updated.id, role: updated.role, tokenVersion: result.tokenVersion });
   return NextResponse.json({
     ok: true,
     account: updated && { id: updated.id, email: updated.email, name: updated.name, role: updated.role },

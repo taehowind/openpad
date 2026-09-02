@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     if (result.reason === "disabled") return apiError("비활성화된 계정입니다. 관리자에게 문의해 주세요.", 403, "DISABLED");
     return apiError("이메일 또는 비밀번호가 올바르지 않습니다.", 401);
   }
-  await setInstructorSession({ id: result.instructor.id, role: result.instructor.role });
+  await setInstructorSession({ id: result.instructor.id, role: result.instructor.role, tokenVersion: result.instructor.token_version ?? 0 });
   return NextResponse.json({
     ok: true,
     account: { id: result.instructor.id, name: result.instructor.name, email: result.instructor.email, role: result.instructor.role },

@@ -165,6 +165,8 @@ const ADDED_COLUMNS: [table: string, column: string, definition: string][] = [
   ["boards", "background", "TEXT NOT NULL DEFAULT 'default'"],
   ["cards", "share_code", "TEXT"],
   ["chat_messages", "hidden", "INTEGER NOT NULL DEFAULT 0"],
+  // Bumped when a password changes, which invalidates every token issued before it.
+  ["instructors", "token_version", "INTEGER NOT NULL DEFAULT 0"],
 ];
 
 async function migrate(driver: Driver) {
@@ -193,7 +195,7 @@ async function migrate(driver: Driver) {
  * new index. It is what tells a deployment its database is behind, so treat bumping it as part of
  * the edit rather than an afterthought: forget, and the migration never runs.
  */
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 const META_TABLE = "CREATE TABLE IF NOT EXISTS schema_meta (id INTEGER PRIMARY KEY, version INTEGER NOT NULL)";
 
