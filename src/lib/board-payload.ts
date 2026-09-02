@@ -2,7 +2,7 @@ import { all } from "@/lib/db";
 import { normalizeBackground } from "@/lib/backgrounds";
 import type { BoardRow } from "@/lib/board-data";
 import { supportsRealtimePush } from "@/lib/runtime";
-import type { AuditEntry, BoardCard, BoardPayload, RevisionEntry } from "@/lib/types";
+import type { AuditEntry, BoardPayload, RevisionEntry } from "@/lib/types";
 
 /**
  * Builds the whole view of a board that the client renders.
@@ -37,13 +37,10 @@ export async function getBoardPayload(
       "SELECT id, name, color, position, grid_col FROM board_columns WHERE board_id = ? ORDER BY grid_col, position",
       board.id,
     ),
-    all<{ id: string; card_id: string; author_name: string; author_emoji: string; content: string; created_at: string }>(
-      `SELECT c.id, c.card_id, COALESCE(p.nickname, c.author_name) AS author_name,
-              CASE WHEN c.actor_type = 'teacher' THEN '🧑‍🏫' ELSE COALESCE(p.emoji, '🙂') END AS author_emoji,
-              c.content, c.created_at
+    all<{ card_id: string; cnt: number }>(
+      `SELECT c.card_id, COUNT(*) AS cnt
          FROM comments c JOIN cards x ON x.id = c.card_id
-         LEFT JOIN participants p ON p.id = c.participant_id
-        WHERE x.board_id = ? ORDER BY c.created_at`, board.id),
+        WHERE x.board_id = ? GROUP BY c.card_id`, board.id),
     all<{ card_id: string; cnt: number; mine: number }>(
       `SELECT r.card_id, COUNT(*) AS cnt, MAX(CASE WHEN r.identity_key = ? THEN 1 ELSE 0 END) AS mine
          FROM card_reactions r JOIN cards x ON x.id = r.card_id
@@ -80,19 +77,7 @@ export async function getBoardPayload(
   ]);
 
   const columns = columnRows.map((column) => ({ id: column.id, name: column.name, color: column.color, position: column.position, gridCol: column.grid_col }));
-  const comments = commentRows;
-  const byCard = new Map<string, BoardCard["comments"]>();
-  for (const comment of comments) {
-    const list = byCard.get(comment.card_id) ?? [];
-    list.push({
-      id: comment.id,
-      authorName: comment.author_name,
-      authorEmoji: comment.author_emoji,
-      content: comment.content,
-      createdAt: comment.created_at,
-    });
-    byCard.set(comment.card_id, list);
-  }
+  const commentCounts = new Map(commentRows.map((row) => [row.card_id, row.cnt]));
   const reactionMap = new Map(reactionRows.map((row) => [row.card_id, { count: row.cnt, mine: row.mine === 1 }]));
   const cards = cardRows.map((card) => ({
     id: card.id,
@@ -114,7 +99,7 @@ export async function getBoardPayload(
     updatedAt: card.updated_at,
     likeCount: reactionMap.get(card.id)?.count ?? 0,
     likedByMe: reactionMap.get(card.id)?.mine ?? false,
-    comments: byCard.get(card.id) ?? [],
+    commentCount: commentCounts.get(card.id) ?? 0,
   }));
   const activity = activityRows.map((item) => ({
     id: item.id,

@@ -82,7 +82,13 @@ export type BoardCard = {
   updatedAt: string;
   likeCount: number;
   likedByMe: boolean;
-  comments: BoardComment[];
+  /**
+   * How many comments the card has, not the comments themselves. Every open board re-fetches this
+   * payload on a timer, and shipping every comment on the board to every viewer each time was the
+   * largest thing in it. The bodies come from GET /api/cards/[id]/comments when a reader actually
+   * opens one.
+   */
+  commentCount: number;
 };
 
 export type AuditEntry = {

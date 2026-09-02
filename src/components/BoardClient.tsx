@@ -21,7 +21,7 @@ import { useToast } from "@/components/ToastProvider";
 import { attachFile, responseError } from "@/lib/api-client";
 import { BOARD_BACKGROUNDS, type BoardBackground } from "@/lib/backgrounds";
 import { renderMarkdown } from "@/lib/markdown";
-import type { BoardCard, BoardPayload, BoardSummary, RevisionEntry } from "@/lib/types";
+import type { BoardCard, BoardComment, BoardPayload, BoardSummary, RevisionEntry } from "@/lib/types";
 
 type BoardClientProps = { identifier: string; mode: "admin" | "share" };
 type ColumnColor = "gray" | "blue" | "cyan" | "green" | "lime" | "yellow" | "orange" | "red" | "pink" | "purple";
@@ -86,6 +86,9 @@ export function BoardClient({ identifier, mode }: BoardClientProps) {
   const [nowTs, setNowTs] = useState(() => Date.now());
   const [commentsOpen, setCommentsOpen] = useState<Record<string, boolean>>({});
   const [commentDraft, setCommentDraft] = useState<Record<string, string>>({});
+  // Comment bodies are fetched per card rather than shipped with every poll of the board. undefined
+  // means "not fetched yet", which is what tells the list to say 불러오는 중 instead of 댓글 없음.
+  const [commentsByCard, setCommentsByCard] = useState<Record<string, BoardComment[] | undefined>>({});
   const [dragging, setDragging] = useState<string | null>(null);
   const [cardDropTarget, setCardDropTarget] = useState<{ id: string; placement: "before" | "after" } | null>(null);
   const [draggingColumn, setDraggingColumn] = useState<string | null>(null);
@@ -137,10 +140,36 @@ export function BoardClient({ identifier, mode }: BoardClientProps) {
     if (!quiet) setLoading(false);
   }, [endpoint, mode]);
 
+  const loadComments = useCallback(async (cardId: string) => {
+    try {
+      const response = await fetch(`/api/cards/${cardId}/comments`, { cache: "no-store" });
+      if (!response.ok) return;
+      const { comments } = await response.json() as { comments: BoardComment[] };
+      setCommentsByCard((current) => ({ ...current, [cardId]: comments }));
+    } catch {
+      // A failed fetch leaves the cache untouched; the next open or poll tries again.
+    }
+  }, []);
+
+  // Which comment lists are on screen. Held in a ref so the heartbeat below can read it without
+  // taking a dependency on it — depending on it would tear down and restart the poll every time
+  // someone opened a card.
+  const openCommentsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const open = new Set(Object.entries(commentsOpen).filter(([, isOpen]) => isOpen).map(([id]) => id));
+    if (detailCard) open.add(detailCard.id);
+    openCommentsRef.current = open;
+  }, [commentsOpen, detailCard]);
+
   useEffect(() => {
     const initialTimer = window.setTimeout(() => void load(), 0);
     // Heartbeat keeps presence fresh and acts as a fallback if the SSE stream drops.
-    const heartbeat = window.setInterval(() => void load(true), 15000);
+    const heartbeat = window.setInterval(() => {
+      void load(true);
+      // Comment bodies no longer ride along with the payload, so refresh the ones being read.
+      // Normally that is nothing, occasionally one card.
+      for (const cardId of openCommentsRef.current) void loadComments(cardId);
+    }, 15000);
     const eventsUrl = mode === "admin" ? `/api/boards/${identifier}/events` : `/api/shared/${identifier}/events`;
     let source: EventSource | null = null;
     try {
@@ -157,7 +186,7 @@ export function BoardClient({ identifier, mode }: BoardClientProps) {
       window.clearInterval(heartbeat);
       source?.close();
     };
-  }, [load, mode, identifier]);
+  }, [load, loadComments, mode, identifier]);
 
   // Opens the OS file picker as soon as the freshly rendered file tab is on screen.
   useEffect(() => {
@@ -599,6 +628,14 @@ export function BoardClient({ identifier, mode }: BoardClientProps) {
     }
   }
 
+  function toggleComments(cardId: string) {
+    // Decide first, then set, then fetch. Firing the request from inside the updater would make it
+    // impure, and React is entitled to call an updater more than once.
+    const opening = !commentsOpen[cardId];
+    setCommentsOpen((current) => ({ ...current, [cardId]: !current[cardId] }));
+    if (opening) void loadComments(cardId);
+  }
+
   async function addComment(cardId: string) {
     const content = commentDraft[cardId]?.trim();
     if (!content) return;
@@ -607,7 +644,8 @@ export function BoardClient({ identifier, mode }: BoardClientProps) {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content }),
       });
       if (!response.ok) throw new Error(await responseError(response, "댓글을 남기지 못했습니다."));
-      await load(true);
+      // The board payload refreshes the count; the list itself is fetched per card now.
+      await Promise.all([load(true), loadComments(cardId)]);
       return true;
     });
     if (added) setCommentDraft((current) => ({ ...current, [cardId]: "" }));
@@ -1004,6 +1042,7 @@ export function BoardClient({ identifier, mode }: BoardClientProps) {
   const galleryItems = isGallery ? [...data.cards].sort((a, b) => b.createdAt.localeCompare(a.createdAt)) : [];
   const previewCard = galleryPreview ? data.cards.find((c) => c.id === galleryPreview.id) ?? galleryPreview : null;
   const detailCardLive = detailCard ? data.cards.find((c) => c.id === detailCard.id) ?? detailCard : null;
+
   // Manual layout: each list has a grid column (gridCol) and stacks vertically by position.
   // Admins get one extra empty trailing column to start a new column in.
   const maxGridCol = data.columns.reduce((max, column) => Math.max(max, column.gridCol), -1);
@@ -1075,11 +1114,11 @@ export function BoardClient({ identifier, mode }: BoardClientProps) {
                       {card.content && <p className="gallery-desc">{card.content}</p>}
                       <div className="gallery-footer">
                         <button className={`like-button ${card.likedByMe ? "liked" : ""}`} aria-pressed={card.likedByMe} aria-label="좋아요" onClick={() => void toggleLike(card)}><Heart size={15} fill={card.likedByMe ? "currentColor" : "none"} /> {card.likeCount > 0 ? card.likeCount : "좋아요"}</button>
-                        <button onClick={() => setCommentsOpen((current) => ({ ...current, [card.id]: !current[card.id] }))}><MessageSquare size={15} /> {card.comments.length || "댓글"}</button>
+                        <button onClick={() => toggleComments(card.id)}><MessageSquare size={15} /> {card.commentCount || "댓글"}</button>
                         <button onClick={() => setGalleryShare(card)}><QrCode size={15} /> 공유</button>
                         {canManageCard(card) && <div className="card-menu"><button aria-label="작품 메뉴" aria-expanded={menuCard === card.id} onClick={(event) => { const opening = menuCard !== card.id; setMenuPos(opening ? anchorMenu(event.currentTarget) : null); setMenuCard(opening ? card.id : null); }}><MoreHorizontal size={16} /></button>{menuCard === card.id && <div className="card-menu-pop" role="menu" style={menuPos ?? undefined}><button role="menuitem" onClick={() => { setMenuCard(null); void openGalleryEdit(card); }}><Pencil size={15} /> 작품 수정</button>{data.isAdmin && <button role="menuitem" onClick={() => void openTransfer("card", card.id, card.title || "작품")}><FolderInput size={15} /> 다른 보드로 이동·복사</button>}<div className="card-menu-sep" /><button className="danger" role="menuitem" onClick={() => void deleteCard(card)}><Trash2 size={15} /> 작품 삭제</button></div>}</div>}
                       </div>
-                      {commentsOpen[card.id] && <div className="comments-area">{card.comments.map((comment) => <div className="comment-row" key={comment.id}><span>{comment.authorEmoji}</span><div><b>{comment.authorName}</b><p>{comment.content}</p></div></div>)}{card.comments.length === 0 && <p className="no-comment">아직 댓글이 없습니다.</p>}{data.canWrite && <div className="comment-compose"><input value={commentDraft[card.id] ?? ""} onChange={(event) => setCommentDraft((current) => ({ ...current, [card.id]: event.target.value }))} onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing) { event.preventDefault(); void addComment(card.id); } }} maxLength={500} placeholder="댓글 쓰기" /><button onClick={() => void addComment(card.id)}><Send size={14} /></button></div>}</div>}
+                      {commentsOpen[card.id] && <div className="comments-area">{(commentsByCard[card.id] ?? []).map((comment) => <div className="comment-row" key={comment.id}><span>{comment.authorEmoji}</span><div><b>{comment.authorName}</b><p>{comment.content}</p></div></div>)}{commentsByCard[card.id] === undefined ? <p className="no-comment">댓글을 불러오는 중…</p> : commentsByCard[card.id]!.length === 0 && <p className="no-comment">아직 댓글이 없습니다.</p>}{data.canWrite && <div className="comment-compose"><input value={commentDraft[card.id] ?? ""} onChange={(event) => setCommentDraft((current) => ({ ...current, [card.id]: event.target.value }))} onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing) { event.preventDefault(); void addComment(card.id); } }} maxLength={500} placeholder="댓글 쓰기" /><button onClick={() => void addComment(card.id)}><Send size={14} /></button></div>}</div>}
                     </div>
                   </article>
                 );
@@ -1207,13 +1246,13 @@ export function BoardClient({ identifier, mode }: BoardClientProps) {
                         )}
                       </div>
                     )}</div>
-                    {card.title && <h3 className="card-openable" onClick={() => setDetailCard(card)}>{card.title}</h3>}
-                    {card.content && <div className="card-content card-openable" onClick={(event) => { if (!(event.target as HTMLElement).closest("a")) setDetailCard(card); }} dangerouslySetInnerHTML={{ __html: renderMarkdown(card.content) }} />}
+                    {card.title && <h3 className="card-openable" onClick={() => { setDetailCard(card); void loadComments(card.id); }}>{card.title}</h3>}
+                    {card.content && <div className="card-content card-openable" onClick={(event) => { if (!(event.target as HTMLElement).closest("a")) { setDetailCard(card); void loadComments(card.id); } }} dangerouslySetInnerHTML={{ __html: renderMarkdown(card.content) }} />}
                     {card.fileId && card.fileType?.startsWith("image/") && card.fileType !== "image/svg+xml" && <button type="button" className="card-image" onClick={() => setLightbox(`/api/files/${card.fileId}`)} aria-label="이미지 크게 보기"><Image src={`/api/files/${card.fileId}`} width={520} height={320} unoptimized alt={card.fileName ?? "첨부 이미지"} /></button>}
                     {card.fileId && (!card.fileType?.startsWith("image/") || card.fileType === "image/svg+xml") && <a href={`/api/files/${card.fileId}`} target="_blank" className="card-file"><File size={21} /><span><b>{card.fileName}</b><small>{fileSize(card.fileSize)}</small></span><Download size={16} /></a>}
                     {card.linkUrl && <a href={card.linkUrl} target="_blank" rel="noreferrer" className="card-link"><Link2 size={15} /><span>{new URL(card.linkUrl).hostname}</span><ExternalLink size={13} /></a>}
-                    <div className="card-footer"><button className={`like-button ${card.likedByMe ? "liked" : ""}`} aria-pressed={card.likedByMe} aria-label="좋아요" onClick={() => void toggleLike(card)}><Heart size={15} fill={card.likedByMe ? "currentColor" : "none"} /> {card.likeCount > 0 ? card.likeCount : "좋아요"}</button><button onClick={() => setCommentsOpen((current) => ({ ...current, [card.id]: !current[card.id] }))}><MessageSquare size={15} /> {card.comments.length ? card.comments.length : "댓글"}</button>{(card.title || card.content) && <button aria-label="본문 복사" onClick={() => void copyCardText(card)}><Copy size={14} /> 복사</button>}{card.fileId && <span><Paperclip size={14} /> 첨부</span>}</div>
-                    {commentsOpen[card.id] && <div className="comments-area">{card.comments.map((comment) => <div className="comment-row" key={comment.id}><span>{comment.authorEmoji}</span><div><b>{comment.authorName}</b><p>{comment.content}</p></div></div>)}{card.comments.length === 0 && <p className="no-comment">아직 댓글이 없습니다.</p>}{data.canWrite && <div className="comment-compose"><input value={commentDraft[card.id] ?? ""} onChange={(event) => setCommentDraft((current) => ({ ...current, [card.id]: event.target.value }))} onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing) { event.preventDefault(); void addComment(card.id); } }} maxLength={500} placeholder="댓글 쓰기" /><button onClick={() => void addComment(card.id)}><Send size={14} /></button></div>}</div>}
+                    <div className="card-footer"><button className={`like-button ${card.likedByMe ? "liked" : ""}`} aria-pressed={card.likedByMe} aria-label="좋아요" onClick={() => void toggleLike(card)}><Heart size={15} fill={card.likedByMe ? "currentColor" : "none"} /> {card.likeCount > 0 ? card.likeCount : "좋아요"}</button><button onClick={() => toggleComments(card.id)}><MessageSquare size={15} /> {card.commentCount ? card.commentCount : "댓글"}</button>{(card.title || card.content) && <button aria-label="본문 복사" onClick={() => void copyCardText(card)}><Copy size={14} /> 복사</button>}{card.fileId && <span><Paperclip size={14} /> 첨부</span>}</div>
+                    {commentsOpen[card.id] && <div className="comments-area">{(commentsByCard[card.id] ?? []).map((comment) => <div className="comment-row" key={comment.id}><span>{comment.authorEmoji}</span><div><b>{comment.authorName}</b><p>{comment.content}</p></div></div>)}{commentsByCard[card.id] === undefined ? <p className="no-comment">댓글을 불러오는 중…</p> : commentsByCard[card.id]!.length === 0 && <p className="no-comment">아직 댓글이 없습니다.</p>}{data.canWrite && <div className="comment-compose"><input value={commentDraft[card.id] ?? ""} onChange={(event) => setCommentDraft((current) => ({ ...current, [card.id]: event.target.value }))} onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing) { event.preventDefault(); void addComment(card.id); } }} maxLength={500} placeholder="댓글 쓰기" /><button onClick={() => void addComment(card.id)}><Send size={14} /></button></div>}</div>}
                   </article>
                 ))}
               </div>
@@ -1285,7 +1324,7 @@ export function BoardClient({ identifier, mode }: BoardClientProps) {
               )}
               {card.content && <div className="slide-content" dangerouslySetInnerHTML={{ __html: renderMarkdown(card.content) }} />}
               {card.linkUrl && <a className="slide-link" href={card.linkUrl} target="_blank" rel="noreferrer"><Link2 size={16} /> {new URL(card.linkUrl).hostname}</a>}
-              <div className="slide-meta"><span><Heart size={16} /> {card.likeCount}</span><span><MessageSquare size={16} /> {card.comments.length}</span></div>
+              <div className="slide-meta"><span><Heart size={16} /> {card.likeCount}</span><span><MessageSquare size={16} /> {card.commentCount}</span></div>
             </div>
             <button type="button" className="slide-nav" aria-label="다음 카드" disabled={index >= slideCards.length - 1} onClick={() => setSlideIndex((i) => Math.min(slideCards.length - 1, i + 1))}><ChevronRight size={30} /></button>
             <div className="slide-counter">{index + 1} / {slideCards.length}</div>
@@ -1314,13 +1353,13 @@ export function BoardClient({ identifier, mode }: BoardClientProps) {
             {detailCardLive.linkUrl && <a href={detailCardLive.linkUrl} target="_blank" rel="noreferrer" className="card-link"><Link2 size={15} /><span>{new URL(detailCardLive.linkUrl).hostname}</span><ExternalLink size={13} /></a>}
             <div className="card-detail-footer">
               <button className={`like-button ${detailCardLive.likedByMe ? "liked" : ""}`} aria-pressed={detailCardLive.likedByMe} aria-label="좋아요" onClick={() => void toggleLike(detailCardLive)}><Heart size={16} fill={detailCardLive.likedByMe ? "currentColor" : "none"} /> {detailCardLive.likeCount > 0 ? detailCardLive.likeCount : "좋아요"}</button>
-              <span className="detail-comment-count"><MessageSquare size={16} /> {detailCardLive.comments.length}</span>
+              <span className="detail-comment-count"><MessageSquare size={16} /> {detailCardLive.commentCount}</span>
               {(detailCardLive.title || detailCardLive.content) && <button onClick={() => void copyCardText(detailCardLive)}><Copy size={15} /> 복사</button>}
               {canManageCard(detailCardLive) && <button onClick={() => { setEditCard(detailCardLive); setDetailCard(null); }}><Pencil size={15} /> 수정</button>}
             </div>
             <div className="comments-area detail-comments">
-              {detailCardLive.comments.map((comment) => <div className="comment-row" key={comment.id}><span>{comment.authorEmoji}</span><div><b>{comment.authorName}</b><p>{comment.content}</p></div></div>)}
-              {detailCardLive.comments.length === 0 && <p className="no-comment">아직 댓글이 없습니다.</p>}
+              {(commentsByCard[detailCardLive.id] ?? []).map((comment) => <div className="comment-row" key={comment.id}><span>{comment.authorEmoji}</span><div><b>{comment.authorName}</b><p>{comment.content}</p></div></div>)}
+              {commentsByCard[detailCardLive.id] === undefined ? <p className="no-comment">댓글을 불러오는 중…</p> : commentsByCard[detailCardLive.id]!.length === 0 && <p className="no-comment">아직 댓글이 없습니다.</p>}
               {data.canWrite && <div className="comment-compose"><input value={commentDraft[detailCardLive.id] ?? ""} onChange={(event) => setCommentDraft((current) => ({ ...current, [detailCardLive.id]: event.target.value }))} onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing) { event.preventDefault(); void addComment(detailCardLive.id); } }} maxLength={500} placeholder="댓글 쓰기" /><button onClick={() => void addComment(detailCardLive.id)}><Send size={14} /></button></div>}
             </div>
           </div>
