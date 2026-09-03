@@ -151,7 +151,7 @@ textarea { resize: vertical; line-height: 1.55; }
 .login-story { position: relative; overflow: hidden; padding: 44px clamp(40px, 6vw, 92px); display: flex; flex-direction: column; color: var(--ink); background: var(--taupe); border-right: 1px solid var(--border); }
 .login-story .brand-copy small { color: var(--smoke); }
 .login-story-copy { position: relative; z-index: 1; margin: auto 0; max-width: 640px; }
-.login-story h1 { margin: 26px 0; font-size: clamp(38px, 4.2vw, 60px); font-weight: 300; line-height: 1.08; letter-spacing: -.03em; }
+.login-story h1 { margin: 26px 0; font-size: clamp(38px, 4.2vw, 60px); font-weight: 700; line-height: 1.1; letter-spacing: -.035em; }
 .login-story h1 em { font-style: normal; color: var(--smoke); }
 .login-story-copy > p { max-width: 540px; color: var(--graphite); font-size: 18px; line-height: 1.7; }
 .login-features { margin-top: 40px; display: flex; flex-wrap: wrap; gap: 9px; }
@@ -160,7 +160,7 @@ textarea { resize: vertical; line-height: 1.55; }
 .login-form-side { display: grid; place-items: center; padding: 40px; background: var(--canvas); }
 .login-card { width: min(100%, 420px); padding: 40px; border: 1px solid var(--border); border-radius: 24px; background: var(--surface); box-shadow: var(--shadow-card); }
 .login-lock { width: 52px; height: 52px; display: grid; place-items: center; margin-bottom: 26px; color: var(--canvas); background: var(--ink); border-radius: 15px; }
-.login-card h2 { margin: 10px 0 8px; font-size: 30px; font-weight: 300; letter-spacing: -.025em; }
+.login-card h2 { margin: 10px 0 8px; font-size: 30px; font-weight: 700; letter-spacing: -.03em; }
 .login-card > p { margin: 0 0 28px; color: var(--smoke); font-size: 15px; }
 /* Stacked label-above-input fields. A checkbox row is not one of those — it sets its own
    single-line flex layout, which this would otherwise outrank on specificity. */
