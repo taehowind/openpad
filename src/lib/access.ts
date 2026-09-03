@@ -40,7 +40,7 @@ export async function ensureMemberParticipant(board: BoardRow, session: Instruct
 // Gallery works are served raw (sandboxed HTML) outside the board payload, so they need their
 // own gate: only a board that is both link-shared AND unprotected is readable by anyone.
 export async function canViewBoardContent(board: BoardRow) {
-  if (board.audience === "link" && !board.access_password_hash) return true;
+  if (board.audience === "link" && !board.access_password && !board.access_password_hash) return true;
   return Boolean(await actorForBoard(board, false));
 }
 

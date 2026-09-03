@@ -16,6 +16,16 @@ export type BoardRow = {
   share_mode: ShareMode;
   owner_id: string | null;
   audience: BoardAudience;
+  /**
+   * The entry code, as the teacher typed it.
+   *
+   * Readable on purpose: the settings screen shows it back so a teacher can read it out to a
+   * room, which a hash cannot do. That makes it a shared room key rather than a credential —
+   * it never reaches a student, only a manager of the board, and the UI says as much so nobody
+   * puts a personal password here.
+   */
+  access_password: string | null;
+  /** Boards created before the readable column existed. Still honoured at join, never shown. */
   access_password_hash: string | null;
   type: BoardType;
   background: string;

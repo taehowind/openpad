@@ -25,6 +25,10 @@ export function AdminClient() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [account, setAccount] = useState<AccountInfo | null>(null);
   const [boards, setBoards] = useState<BoardSummary[]>([]);
+  // Distinguishes "no boards" from "boards have not arrived yet". Without it the empty state
+  // renders in the gap between the session resolving and the list loading, so a teacher who
+  // has boards sees an invitation to create their first one flash past on every visit.
+  const [boardsLoaded, setBoardsLoaded] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState(() => (typeof window !== "undefined" ? localStorage.getItem("aistudy_saved_email") ?? "" : ""));
   const [rememberEmail, setRememberEmail] = useState(() => (typeof window !== "undefined" ? Boolean(localStorage.getItem("aistudy_saved_email")) : false));
@@ -47,12 +51,15 @@ export function AdminClient() {
   const [createAudience, setCreateAudience] = useState<BoardAudience>("link");
   const [createBackground, setCreateBackground] = useState<BoardBackground>("default");
   const [createType, setCreateType] = useState<BoardType>("board");
+  const [useAccessPassword, setUseAccessPassword] = useState(false);
+  const [createPassword, setCreatePassword] = useState("");
 
   const loadBoards = useCallback(async () => {
     const response = await fetch("/api/boards", { cache: "no-store" });
     if (response.status === 401) { setAuthenticated(false); setAccount(null); return; }
     if (!response.ok) { setError(await responseError(response, "보드 목록을 불러오지 못했습니다.")); return; }
     setBoards(await response.json());
+    setBoardsLoaded(true);
   }, []);
 
   const init = useCallback(async () => {
@@ -143,12 +150,13 @@ export function AdminClient() {
     }
   }
 
-  async function copyCode(board: BoardSummary) {
+  async function copyAccessPassword(board: BoardSummary) {
+    if (!board.accessPassword) return;
     try {
-      await navigator.clipboard.writeText(board.shareCode);
-      toast.show("참여 코드를 클립보드에 복사했습니다.", "success");
+      await navigator.clipboard.writeText(board.accessPassword);
+      toast.show("입장 비밀번호를 클립보드에 복사했습니다.", "success");
     } catch {
-      toast.show("코드를 복사하지 못했습니다. 브라우저 권한을 확인해 주세요.", "error", 4500);
+      toast.show("복사하지 못했습니다. 브라우저 권한을 확인해 주세요.", "error", 4500);
     }
   }
 
@@ -200,12 +208,26 @@ export function AdminClient() {
     }
   }
 
+  // Offered as a starting point when the teacher turns the code on. Letters that are easy to
+  // confuse when read aloud are left out, the same way the board's own share code is built.
+  function suggestPassword() {
+    const alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+    const values = new Uint32Array(6);
+    crypto.getRandomValues(values);
+    return [...values].map((value) => alphabet[value % alphabet.length]).join("");
+  }
+
+  function toggleAccessPassword(on: boolean) {
+    setUseAccessPassword(on);
+    if (on && !createPassword) setCreatePassword(suggestPassword());
+  }
+
   async function createBoard(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
     setError("");
     const form = new FormData(event.currentTarget);
-    const rawPassword = String(form.get("accessPassword") ?? "").trim();
+    const rawPassword = useAccessPassword ? createPassword.trim() : "";
     const data = await runAction("새 강의 보드를 만드는 중…", "새 강의 보드를 만들었습니다.", "보드를 만들지 못했습니다.", async () => {
       const response = await fetch("/api/boards", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -344,8 +366,7 @@ export function AdminClient() {
     });
   }
 
-  const shareUrl = (board: BoardSummary) => `${window.location.origin}/j/${board.shareCode}`;
-  const shareHost = typeof window !== "undefined" ? window.location.host : "";
+  const shareUrl = (board: BoardSummary) => `${window.location.origin}/wz/${board.shareCode}`;
 
   if (authenticated === null) {
     return <main className="center-screen"><div className="spinner" /><p>강사 공간을 준비하고 있습니다.</p></main>;
@@ -424,7 +445,7 @@ export function AdminClient() {
           <button className="primary-button compact" onClick={() => setCreateOpen(true)}><Plus size={18} /> 새 보드 만들기</button>
         </div>
         {error && <div className="error-banner">{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
-        {boards.length === 0 ? (
+        {!boardsLoaded ? null : boards.length === 0 ? (
           <div className="dashboard-empty">
             <span><BookOpen size={32} /></span><h2>첫 강의 보드를 만들어 보세요</h2>
             <p>기본 목록이 자동으로 준비되고, 바로 공유할 수 있습니다.</p>
@@ -499,7 +520,20 @@ export function AdminClient() {
               </select>
             </label>
             {createAudience === "link" && (
-              <label><span>입장 비밀번호 (선택)</span><input name="accessPassword" type="password" maxLength={100} placeholder="비우면 비밀번호 없이 입장" autoComplete="new-password" /></label>
+              <>
+                <label className="checkbox-row">
+                  <input type="checkbox" checked={useAccessPassword} onChange={(event) => toggleAccessPassword(event.target.checked)} />
+                  <span>입장 비밀번호 사용</span>
+                </label>
+                {useAccessPassword && (
+                  <label>
+                    <span>입장 비밀번호</span>
+                    <input type="text" value={createPassword} onChange={(event) => setCreatePassword(event.target.value)}
+                      maxLength={100} autoComplete="off" spellCheck={false} required />
+                    <small className="field-hint">수강생에게 그대로 알려 주는 값입니다. 강사 본인 비밀번호는 쓰지 마세요.</small>
+                  </label>
+                )}
+              </>
             )}
             <div className="field"><span>보드 배경</span>
               <div className="bg-picker">
@@ -526,13 +560,15 @@ export function AdminClient() {
         <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setShareBoard(null)}>
           <div className="modal-card share-modal" role="dialog" aria-modal="true" aria-labelledby="share-board-title">
             <button type="button" className="modal-close" aria-label="공유 설정 창 닫기" onClick={() => setShareBoard(null)}><X size={18} /></button>
-            <span className="kicker">SHARE BOARD</span><h2 id="share-board-title">{shareBoard.title}</h2><p>아래 짧은 주소나 참여 코드를 알려 주세요. 접근 설정에 따라 입장이 제한됩니다.</p>
-            <div className="share-code-block">
-              <span className="share-code-label">참여 코드</span>
-              <strong className="share-code-value">{shareBoard.shareCode}</strong>
-              <button type="button" className="share-code-copy" aria-label="참여 코드 복사" onClick={() => void copyCode(shareBoard)}><Copy size={15} /> 코드 복사</button>
-              <small>주소창에 <b>{shareHost}/j/{shareBoard.shareCode}</b> 를 입력해도 됩니다.</small>
-            </div>
+            <span className="kicker">SHARE BOARD</span><h2 id="share-board-title">{shareBoard.title}</h2><p>아래 주소를 알려 주세요. 입장 비밀번호를 사용하면 함께 알려 주셔야 합니다.</p>
+            {shareBoard.accessPassword && (
+              <div className="share-code-block">
+                <span className="share-code-label">입장 비밀번호</span>
+                <strong className="share-code-value">{shareBoard.accessPassword}</strong>
+                <button type="button" className="share-code-copy" aria-label="입장 비밀번호 복사" onClick={() => void copyAccessPassword(shareBoard)}><Copy size={15} /> 복사</button>
+                <small>수강생이 처음 입장할 때 입력합니다.</small>
+              </div>
+            )}
             <label><span>접근 대상</span>
               <select value={shareBoard.audience} onChange={(event) => void updateAccess(shareBoard, { audience: event.target.value as BoardAudience })} disabled={busy}>
                 <option value="link">링크 가진 누구나 (수강생 포함)</option>

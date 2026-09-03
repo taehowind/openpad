@@ -7,7 +7,6 @@ import { getBoardPayload } from "@/lib/board-payload";
 import { all, run, transaction } from "@/lib/db";
 import { apiError } from "@/lib/http";
 import { normalizeBackground } from "@/lib/backgrounds";
-import { hashPassword } from "@/lib/password";
 import { removeUpload } from "@/lib/storage";
 
 type Context = { params: Promise<{ slug: string }> };
@@ -41,13 +40,16 @@ export async function PATCH(request: Request, context: Context) {
   if (!parsed.success) return apiError("변경할 정보를 다시 확인해 주세요.");
   const shareToken = parsed.data.rotateShareLink ? randomBytes(24).toString("base64url") : board.share_token;
   const shareCode = parsed.data.rotateShareLink ? (await uniqueShareCode()) : board.share_code;
-  const passwordHash = parsed.data.accessPassword === undefined
-    ? board.access_password_hash
-    : (parsed.data.accessPassword.trim() ? hashPassword(parsed.data.accessPassword.trim()) : null);
+  // Setting a password writes the readable column and drops any legacy hash, so a board only ever
+  // has one of the two and the settings screen can always show what it has.
+  const accessPassword = parsed.data.accessPassword === undefined
+    ? board.access_password
+    : (parsed.data.accessPassword.trim() || null);
+  const legacyHash = parsed.data.accessPassword === undefined ? board.access_password_hash : null;
   (await transaction(async () => {
-    (await run(`UPDATE boards SET title = ?, description = ?, share_mode = ?, audience = ?, access_password_hash = ?, background = ?, share_token = ?, share_code = ?, updated_at = ? WHERE id = ?`,
+    (await run(`UPDATE boards SET title = ?, description = ?, share_mode = ?, audience = ?, access_password = ?, access_password_hash = ?, background = ?, share_token = ?, share_code = ?, updated_at = ? WHERE id = ?`,
       parsed.data.title ?? board.title, parsed.data.description ?? board.description,
-      parsed.data.shareMode ?? board.share_mode, parsed.data.audience ?? board.audience, passwordHash,
+      parsed.data.shareMode ?? board.share_mode, parsed.data.audience ?? board.audience, accessPassword, legacyHash,
       parsed.data.background === undefined ? normalizeBackground(board.background) : normalizeBackground(parsed.data.background),
       shareToken, shareCode, now(), id));
     (await recordAction(id, { type: "teacher", name: manager.name },

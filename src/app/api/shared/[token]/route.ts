@@ -30,11 +30,11 @@ export async function GET(_: Request, context: Context) {
   }
 
   // Link boards (students). Password-protected boards never auto-enroll — a new visitor must pass the gate.
-  const autoEnroll = !board.access_password_hash;
+  const autoEnroll = !board.access_password && !board.access_password_hash;
   const participant = await resolveParticipantForBoard(board.id, autoEnroll);
   if (!participant) {
     return NextResponse.json(
-      { error: "프로필을 만들고 보드에 참여해 주세요.", code: "JOIN_REQUIRED", passwordRequired: Boolean(board.access_password_hash) },
+      { error: "프로필을 만들고 보드에 참여해 주세요.", code: "JOIN_REQUIRED", passwordRequired: Boolean(board.access_password || board.access_password_hash) },
       { status: 401 },
     );
   }

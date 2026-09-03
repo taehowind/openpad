@@ -147,7 +147,10 @@ export async function getBoardPayload(
         shareToken: board.share_token,
         shareCode: board.share_code,
         audience: board.audience,
-        requirePassword: Boolean(board.access_password_hash),
+        requirePassword: Boolean(board.access_password || board.access_password_hash),
+        // Managers only — this branch is inside the isAdmin gate. A student's payload has no
+        // such field, so the code they must type never travels to them.
+        accessPassword: board.access_password,
       } : {}),
       createdAt: board.created_at,
       updatedAt: board.updated_at,

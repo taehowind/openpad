@@ -5,7 +5,7 @@ import { getDeviceId, setParticipantSession } from "@/lib/auth";
 import { getBoardByShareId, now, recordAction } from "@/lib/board-data";
 import { get, run, transaction } from "@/lib/db";
 import { apiError, clientIp, rateLimitedShared } from "@/lib/http";
-import { verifyPassword } from "@/lib/password";
+import { matchesSecret, verifyPassword } from "@/lib/password";
 import { isProfileEmoji } from "@/lib/profile";
 
 type Context = { params: Promise<{ token: string }> };
@@ -24,14 +24,18 @@ export async function POST(request: Request, context: Context) {
   if (board.audience === "members") return apiError("회원 전용 보드입니다. 강사 계정으로 로그인해 주세요.", 403, "MEMBERS_ONLY");
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success || !isProfileEmoji(parsed.data.emoji)) return apiError("닉네임과 이모티콘을 선택해 주세요.");
-  if (board.access_password_hash) {
-    // Throttle per board as well as per IP — the password is short and shared with a whole class.
+  // Boards set up since the entry code became readable carry it in access_password; older ones
+  // still only have a hash, and both have to keep opening the same door.
+  if (board.access_password || board.access_password_hash) {
+    // Throttle per board as well as per IP — the code is short and shared with a whole class.
     if (await rateLimitedShared(`board-pw:${board.id}:${ip}`, 10, 10 * 60_000) || await rateLimitedShared(`board-pw:${board.id}`, 60, 10 * 60_000)) {
-      return apiError("비밀번호 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.", 429);
+      return apiError("입장 비밀번호 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.", 429);
     }
-    if (!parsed.data.password || !verifyPassword(parsed.data.password, board.access_password_hash)) {
-      return apiError("보드 비밀번호가 올바르지 않습니다.", 403, "BAD_PASSWORD");
-    }
+    const given = parsed.data.password ?? "";
+    const ok = board.access_password
+      ? matchesSecret(given, board.access_password)
+      : verifyPassword(given, board.access_password_hash!);
+    if (!ok) return apiError("입장 비밀번호가 올바르지 않습니다.", 403, "BAD_PASSWORD");
   }
   const deviceId = (await getDeviceId()) ?? randomUUID();
   const timestamp = now();

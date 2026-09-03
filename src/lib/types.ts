@@ -120,6 +120,8 @@ export type BoardPayload = {
     shareCode?: string;
     audience?: BoardAudience;
     requirePassword?: boolean;
+    /** Managers only; absent from a student's payload. */
+    accessPassword?: string | null;
     createdAt: string;
     updatedAt: string;
   };
@@ -147,6 +149,8 @@ export type BoardSummary = {
   background: BoardBackground;
   audience: BoardAudience;
   requirePassword: boolean;
+  /** The entry code as written, so the owner's dashboard can show it. Never sent to students. */
+  accessPassword?: string | null;
   ownerId: string | null;
   ownerName: string | null;
   createdAt: string;

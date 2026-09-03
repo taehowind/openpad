@@ -299,6 +299,16 @@ textarea { resize: vertical; line-height: 1.55; }
 .share-code-block small { color: var(--smoke); font-size: 12px; line-height: 1.5; }
 .share-code-block small b { color: var(--graphite); font-weight: 500; font-family: var(--font-geist-mono), monospace; }
 
+/* Change / clear, under the entry code the settings screen shows back. */
+.share-code-actions { display: flex; justify-content: center; gap: 8px; }
+.share-code-actions button { min-height: 34px; padding: 0 14px; color: var(--ink); background: var(--surface); border: 1px solid var(--btn-border); border-radius: 9999px; font-size: 13px; transition: background .15s, color .15s, border-color .15s; }
+.share-code-actions button:hover { background: var(--stone); }
+.share-code-actions button.danger { color: var(--danger-text); border-color: var(--danger-border); background: var(--danger-surface); }
+.share-code-actions button.danger:hover { color: #fff; background: var(--danger); border-color: var(--danger); }
+
+/* A note under a form field — quieter than the label, not an error. */
+.field-hint { color: var(--smoke); font-size: 12px; line-height: 1.5; }
+
 .modal-actions { margin-top: 20px; display: flex; justify-content: flex-end; gap: 9px; }
 .danger-zone { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
 .danger-zone button { display: inline-flex; align-items: center; gap: 7px; color: var(--danger); border: 0; background: none; font-size: 14px; }

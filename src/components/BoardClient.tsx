@@ -299,21 +299,39 @@ export function BoardClient({ identifier, mode }: BoardClientProps) {
   async function copyShareLink() {
     try {
       if (!data?.board.shareCode) throw new Error("복사할 공유 링크가 없습니다.");
-      await navigator.clipboard.writeText(`${window.location.origin}/j/${data.board.shareCode}`);
+      await navigator.clipboard.writeText(`${window.location.origin}/wz/${data.board.shareCode}`);
       toast.show("공유 링크를 클립보드에 복사했습니다.", "success");
     } catch {
       toast.show("링크를 복사하지 못했습니다. 브라우저 권한을 확인해 주세요.", "error", 4500);
     }
   }
 
-  async function copyShareCode() {
+  async function copyAccessPassword() {
     try {
-      if (!data?.board.shareCode) throw new Error("복사할 참여 코드가 없습니다.");
-      await navigator.clipboard.writeText(data.board.shareCode);
-      toast.show("참여 코드를 클립보드에 복사했습니다.", "success");
+      if (!data?.board.accessPassword) throw new Error("복사할 입장 비밀번호가 없습니다.");
+      await navigator.clipboard.writeText(data.board.accessPassword);
+      toast.show("입장 비밀번호를 클립보드에 복사했습니다.", "success");
     } catch {
-      toast.show("코드를 복사하지 못했습니다. 브라우저 권한을 확인해 주세요.", "error", 4500);
+      toast.show("복사하지 못했습니다. 브라우저 권한을 확인해 주세요.", "error", 4500);
     }
+  }
+
+  async function clearBoardAccessPassword() {
+    if (!data?.isAdmin) return;
+    const ok = await dialog.confirm({
+      title: "입장 비밀번호 사용 안 함",
+      message: "앞으로는 링크를 가진 사람이 비밀번호 없이 입장합니다. 계속할까요?",
+      confirmLabel: "사용 안 함",
+      tone: "danger",
+    });
+    if (!ok) return;
+    await runAction("설정을 저장하는 중…", "입장 비밀번호를 해제했습니다.", "설정을 변경하지 못했습니다.", async () => {
+      const response = await fetch(`/api/boards/${data.board.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accessPassword: "" }),
+      });
+      if (!response.ok) throw new Error(await responseError(response, "설정을 변경하지 못했습니다."));
+      await load(true);
+    });
   }
 
   async function refreshBoard() {
@@ -942,9 +960,9 @@ export function BoardClient({ identifier, mode }: BoardClientProps) {
     if (!data?.isAdmin) return;
     const value = await dialog.prompt({
       title: "입장 비밀번호 설정",
-      message: "수강생이 링크로 입장할 때 입력할 비밀번호입니다. 비워서 저장하면 비밀번호가 해제됩니다.",
+      message: "수강생이 처음 입장할 때 입력하는 값입니다. 설정 화면에 그대로 표시되니 강사 본인 비밀번호는 쓰지 마세요.",
       label: "입장 비밀번호",
-      placeholder: data.board.requirePassword ? "새 비밀번호 (비우면 해제)" : "비밀번호 입력",
+      placeholder: data.board.requirePassword ? "새 입장 비밀번호" : "예: KMPT47",
       confirmLabel: "저장",
       required: false,
       maxLength: 100,
@@ -1036,7 +1054,7 @@ export function BoardClient({ identifier, mode }: BoardClientProps) {
   }
 
   if (!data) return null;
-  const shareUrl = data.board.shareCode ? `${window.location.origin}/j/${data.board.shareCode}` : "";
+  const shareUrl = data.board.shareCode ? `${window.location.origin}/wz/${data.board.shareCode}` : "";
   const canManageCard = (card: BoardCard) => data.isAdmin || (!!data.participant && card.authorId === data.participant.id);
   const isGallery = data.board.type === "gallery";
   const galleryItems = isGallery ? [...data.cards].sort((a, b) => b.createdAt.localeCompare(a.createdAt)) : [];
@@ -1509,7 +1527,7 @@ export function BoardClient({ identifier, mode }: BoardClientProps) {
             <header><div><span className="kicker">INSTRUCTOR CONTROL</span><h2 id="instructor-panel-title">{panel === "activity" ? "활동 기록" : panel === "versions" ? "버전 관리" : "보드 설정"}</h2></div><button aria-label="강사 관리 패널 닫기" onClick={() => setPanel(null)}><X size={19} /></button></header>
             {panel === "activity" && <div className="timeline">{data.activity.map((entry) => <div className="timeline-item" key={entry.id}><span className={entry.actorType === "teacher" ? "teacher-event" : "guest-event"}>{entry.actorType === "teacher" ? <ShieldCheck size={15} /> : <Activity size={15} />}</span><div><b>{entry.actorName}</b><p>{entry.action}</p><small><Clock3 size={12} /> {formatTime(entry.createdAt)}{typeof entry.details.deviceKey === "string" && ` · 기기 ${entry.details.deviceKey}`}</small></div></div>)}{data.activity.length === 0 && <p className="panel-empty">아직 활동 기록이 없습니다.</p>}</div>}
             {panel === "versions" && <div className="version-panel"><div className="version-intro"><FileClock size={23} /><div><b>모든 강사 작업은 자동 저장됩니다.</b><p>최종본 또는 원하는 자동 버전으로 언제든 복원할 수 있습니다.</p></div></div><button className="primary-button compact full" onClick={() => void saveFinal()}><Save size={16} /> 현재 상태를 최종본으로 저장</button><div className="version-list">{data.revisions.map((revision) => <div className={`version-item ${revision.kind === "final" ? "final-version" : ""}`} key={revision.id}><span>{revision.kind === "final" ? <Save size={16} /> : <History size={16} />}</span><div><b>{revision.label}</b><small>{formatTime(revision.createdAt)} · {revision.kind === "final" ? "최종본" : "자동 저장"}</small></div><button onClick={() => void restore(revision)}><RotateCcw size={15} /> 복원</button></div>)}</div></div>}
-            {panel === "settings" && <form className="settings-form" onSubmit={updateSettings}><label><span>보드 제목</span><input name="title" defaultValue={data.board.title} maxLength={120} required /></label><label><span>설명</span><textarea name="description" defaultValue={data.board.description} maxLength={500} rows={4} /></label><label><span>접근 대상</span><select name="audience" defaultValue={data.board.audience ?? "link"}><option value="link">링크 가진 누구나 (수강생 포함)</option><option value="members">회원 전용 (로그인한 강사만)</option></select></label><label><span>권한</span><select name="shareMode" defaultValue={data.board.shareMode}><option value="readonly">읽기 전용</option><option value="write">읽기·쓰기 가능</option></select></label><div className="field"><span>보드 배경</span><div className="bg-picker">{BOARD_BACKGROUNDS.map((item) => (<button type="button" key={item.value} className={`bg-swatch ${settingsBackground === item.value ? "selected" : ""}`} data-board-bg={item.value} aria-label={item.label} aria-pressed={settingsBackground === item.value} title={item.label} onClick={() => setSettingsBackground(item.value)}><i />{settingsBackground === item.value && <Check size={16} />}</button>))}</div></div><div className="share-link-box"><Lock size={16} /><span>{data.board.requirePassword ? "입장 비밀번호 설정됨" : "입장 비밀번호 없음"}</span><button type="button" onClick={() => void setBoardAccessPassword()}>{data.board.requirePassword ? "변경" : "설정"}</button></div>{data.board.shareCode && <div className="share-code-block"><span className="share-code-label">참여 코드</span><strong className="share-code-value">{data.board.shareCode}</strong><button type="button" className="share-code-copy" aria-label="참여 코드 복사" onClick={() => void copyShareCode()}><Copy size={15} /> 코드 복사</button></div>}<div className="share-link-box"><Link2 size={17} /><span>{shareUrl}</span><button type="button" aria-label="공유 링크 복사" onClick={() => void copyShareLink()}><Copy size={16} /></button></div><button className="primary-button"><Save size={16} /> 설정 저장</button></form>}
+            {panel === "settings" && <form className="settings-form" onSubmit={updateSettings}><label><span>보드 제목</span><input name="title" defaultValue={data.board.title} maxLength={120} required /></label><label><span>설명</span><textarea name="description" defaultValue={data.board.description} maxLength={500} rows={4} /></label><label><span>접근 대상</span><select name="audience" defaultValue={data.board.audience ?? "link"}><option value="link">링크 가진 누구나 (수강생 포함)</option><option value="members">회원 전용 (로그인한 강사만)</option></select></label><label><span>권한</span><select name="shareMode" defaultValue={data.board.shareMode}><option value="readonly">읽기 전용</option><option value="write">읽기·쓰기 가능</option></select></label><div className="field"><span>보드 배경</span><div className="bg-picker">{BOARD_BACKGROUNDS.map((item) => (<button type="button" key={item.value} className={`bg-swatch ${settingsBackground === item.value ? "selected" : ""}`} data-board-bg={item.value} aria-label={item.label} aria-pressed={settingsBackground === item.value} title={item.label} onClick={() => setSettingsBackground(item.value)}><i />{settingsBackground === item.value && <Check size={16} />}</button>))}</div></div>{data.board.accessPassword ? (<div className="share-code-block"><span className="share-code-label">입장 비밀번호</span><strong className="share-code-value">{data.board.accessPassword}</strong><button type="button" className="share-code-copy" aria-label="입장 비밀번호 복사" onClick={() => void copyAccessPassword()}><Copy size={15} /> 복사</button><small>수강생이 처음 입장할 때 입력합니다.</small><div className="share-code-actions"><button type="button" onClick={() => void setBoardAccessPassword()}>변경</button><button type="button" className="danger" onClick={() => void clearBoardAccessPassword()}>사용 안 함</button></div></div>) : (<div className="share-link-box"><Lock size={16} /><span>{data.board.requirePassword ? "입장 비밀번호 설정됨 (이전 방식이라 표시할 수 없습니다)" : "입장 비밀번호 없음"}</span><button type="button" onClick={() => void setBoardAccessPassword()}>{data.board.requirePassword ? "다시 설정" : "설정"}</button></div>)}<div className="share-link-box"><Link2 size={17} /><span>{shareUrl}</span><button type="button" aria-label="공유 링크 복사" onClick={() => void copyShareLink()}><Copy size={16} /></button></div><button className="primary-button"><Save size={16} /> 설정 저장</button></form>}
           </aside>
         </div>
       )}
