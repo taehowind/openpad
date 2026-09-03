@@ -7,6 +7,7 @@ import {
   LockKeyhole, LogOut, MoreHorizontal, Pencil, Plus, QrCode, RefreshCw, Shield, ShieldCheck,
   Trash2, UserCheck, UserPlus, Users, UserX, X,
 } from "lucide-react";
+import { AccessPasswordField } from "@/components/AccessPasswordField";
 import { Brand } from "@/components/Brand";
 import { useDialog } from "@/components/DialogProvider";
 import { QrModal } from "@/components/QrModal";
@@ -53,6 +54,9 @@ export function AdminClient() {
   const [createType, setCreateType] = useState<BoardType>("board");
   const [useAccessPassword, setUseAccessPassword] = useState(false);
   const [createPassword, setCreatePassword] = useState("");
+  // The share dialog saves each control as it changes, but a text field cannot save per
+  // keystroke, so it is held here and committed on blur or on toggling the checkbox.
+  const [sharePasswordDraft, setSharePasswordDraft] = useState<string | null>(null);
 
   const loadBoards = useCallback(async () => {
     const response = await fetch("/api/boards", { cache: "no-store" });
@@ -150,6 +154,11 @@ export function AdminClient() {
     }
   }
 
+  function openShareBoard(board: BoardSummary | null) {
+    setShareBoard(board);
+    setSharePasswordDraft(board?.accessPassword ?? "");
+  }
+
   async function copyAccessPassword(board: BoardSummary) {
     if (!board.accessPassword) return;
     try {
@@ -208,20 +217,6 @@ export function AdminClient() {
     }
   }
 
-  // Offered as a starting point when the teacher turns the code on. Letters that are easy to
-  // confuse when read aloud are left out, the same way the board's own share code is built.
-  function suggestPassword() {
-    const alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-    const values = new Uint32Array(6);
-    crypto.getRandomValues(values);
-    return [...values].map((value) => alphabet[value % alphabet.length]).join("");
-  }
-
-  function toggleAccessPassword(on: boolean) {
-    setUseAccessPassword(on);
-    if (on && !createPassword) setCreatePassword(suggestPassword());
-  }
-
   async function createBoard(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
@@ -267,24 +262,12 @@ export function AdminClient() {
         shareMode: changes.shareMode ?? current.shareMode,
         audience: changes.audience ?? current.audience,
         requirePassword: changes.accessPassword === undefined ? current.requirePassword : changes.accessPassword.trim().length > 0,
+        accessPassword: changes.accessPassword === undefined ? current.accessPassword : (changes.accessPassword.trim() || null),
       } : null);
     }
     setBusy(false);
   }
 
-  async function setBoardPassword(board: BoardSummary) {
-    const value = await dialog.prompt({
-      title: "입장 비밀번호 설정",
-      message: "수강생이 링크로 입장할 때 입력할 비밀번호입니다. 비워서 저장하면 비밀번호가 해제됩니다.",
-      label: "입장 비밀번호",
-      placeholder: board.requirePassword ? "새 비밀번호 (비우면 해제)" : "비밀번호 입력",
-      confirmLabel: "저장",
-      required: false,
-      maxLength: 100,
-    });
-    if (value === null) return;
-    await updateAccess(board, { accessPassword: value });
-  }
 
   async function rotateLink(board: BoardSummary) {
     const ok = await dialog.confirm({
@@ -461,7 +444,7 @@ export function AdminClient() {
                     {board.audience === "members" && <span className="audience-badge"><Shield size={12} /> 회원 전용</span>}
                     {board.requirePassword && <span className="audience-badge lock"><Lock size={12} /> 비밀번호</span>}
                   </div>
-                  <button className="more-button" onClick={(event) => { event.stopPropagation(); setShareBoard(board); }} aria-label="공유 설정"><MoreHorizontal size={19} /></button>
+                  <button className="more-button" onClick={(event) => { event.stopPropagation(); openShareBoard(board); }} aria-label="공유 설정"><MoreHorizontal size={19} /></button>
                 </div>
                 <div className="board-card-copy"><h2>{board.title}</h2><p>{board.description || "설명이 없습니다."}</p></div>
                 <div className="board-card-footer">
@@ -512,7 +495,6 @@ export function AdminClient() {
             </label>
             <label><span>보드 제목</span><input name="title" maxLength={120} placeholder={createType === "gallery" ? "예: 3반 바이브코딩 작품 갤러리" : "예: 생성형 AI 업무 활용 실습"} required autoFocus /></label>
             <label><span>설명</span><textarea name="description" maxLength={500} rows={3} placeholder="수업 목표나 참여 방법을 적어 주세요." /></label>
-            {createType === "board" && <label><span>권한</span><select name="shareMode" defaultValue="readonly"><option value="readonly">읽기 전용</option><option value="write">읽기·쓰기 가능</option></select></label>}
             <label><span>접근 대상</span>
               <select name="audience" value={createAudience} onChange={(event) => setCreateAudience(event.target.value as BoardAudience)}>
                 <option value="link">링크 가진 누구나 (수강생 포함)</option>
@@ -520,21 +502,13 @@ export function AdminClient() {
               </select>
             </label>
             {createAudience === "link" && (
-              <>
-                <label className="checkbox-row">
-                  <input type="checkbox" checked={useAccessPassword} onChange={(event) => toggleAccessPassword(event.target.checked)} />
-                  <span>입장 비밀번호 사용</span>
-                </label>
-                {useAccessPassword && (
-                  <label>
-                    <span>입장 비밀번호</span>
-                    <input type="text" value={createPassword} onChange={(event) => setCreatePassword(event.target.value)}
-                      maxLength={100} autoComplete="off" spellCheck={false} required />
-                    <small className="field-hint">수강생에게 그대로 알려 주는 값입니다. 강사 본인 비밀번호는 쓰지 마세요.</small>
-                  </label>
-                )}
-              </>
+              <AccessPasswordField
+                enabled={useAccessPassword}
+                value={createPassword}
+                onChange={({ enabled, value }) => { setUseAccessPassword(enabled); setCreatePassword(value); }}
+              />
             )}
+            {createType === "board" && <label><span>권한</span><select name="shareMode" defaultValue="readonly"><option value="readonly">읽기 전용</option><option value="write">읽기·쓰기 가능</option></select></label>}
             <div className="field"><span>보드 배경</span>
               <div className="bg-picker">
                 {BOARD_BACKGROUNDS.map((item) => (
@@ -575,10 +549,20 @@ export function AdminClient() {
                 <option value="members">회원 전용 (로그인한 강사만)</option>
               </select>
             </label>
-            <label><span>권한</span><select value={shareBoard.shareMode} onChange={(event) => void updateAccess(shareBoard, { shareMode: event.target.value as ShareMode })} disabled={busy}><option value="readonly">읽기 전용</option><option value="write">읽기·쓰기 가능</option></select></label>
             {shareBoard.audience === "link" && (
-              <div className="share-link-box"><Lock size={16} /><span>{shareBoard.requirePassword ? "입장 비밀번호 설정됨" : "입장 비밀번호 없음"}</span><button type="button" onClick={() => void setBoardPassword(shareBoard)}>{shareBoard.requirePassword ? "변경" : "설정"}</button></div>
+              <AccessPasswordField
+                enabled={(sharePasswordDraft ?? "").length > 0}
+                value={sharePasswordDraft ?? ""}
+                disabled={busy}
+                onChange={({ value }) => setSharePasswordDraft(value)}
+                onCommit={() => {
+                  const next = sharePasswordDraft ?? "";
+                  if (next === (shareBoard.accessPassword ?? "")) return;
+                  void updateAccess(shareBoard, { accessPassword: next });
+                }}
+              />
             )}
+            <label><span>권한</span><select value={shareBoard.shareMode} onChange={(event) => void updateAccess(shareBoard, { shareMode: event.target.value as ShareMode })} disabled={busy}><option value="readonly">읽기 전용</option><option value="write">읽기·쓰기 가능</option></select></label>
             <div className="share-link-box"><Link2 size={17} /><span>{shareUrl(shareBoard)}</span><button type="button" aria-label="공유 링크 복사" onClick={() => void copyShareLink(shareBoard)}><Copy size={16} /></button></div>
             <div className="modal-actions"><button type="button" className="secondary-button" onClick={() => void rotateLink(shareBoard)}><RefreshCw size={16} /> 링크 재발급</button><button type="button" className="secondary-button" onClick={() => setQrBoard(shareBoard)}><QrCode size={16} /> 공유 QR</button><button type="button" className="primary-button compact" onClick={() => void copyShareLink(shareBoard)}><Copy size={16} /> 링크 복사</button></div>
             <div className="danger-zone"><button type="button" onClick={() => { void deleteBoard(shareBoard); setShareBoard(null); }}><Trash2 size={16} /> 보드 삭제</button></div>

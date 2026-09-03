@@ -790,6 +790,10 @@ body:has(.modal-backdrop), body:has(.side-panel-backdrop) { overflow: hidden; }
 .modal-card .field > label, .settings-form label > span, .dialog-field > span { font-size: 13px; font-weight: 500; color: var(--graphite); }
 /* Board canvas themes — only the canvas/surface tints change, so text contrast, cards and
    the dark palette all keep working. Applied via data-board-bg on .trello-shell. */
+/* "기본" needs its own rule like the rest. Without one the swatch has nothing to override the
+   surrounding board's tint, so inside a themed board it previewed that board instead of the
+   plain canvas it actually applies. */
+[data-board-bg="default"]   { --canvas: #f1ede6; --taupe: #e8e2d8; }
 [data-board-bg="cream"]     { --canvas: #f6efe3; --taupe: #efe6d6; }
 [data-board-bg="sky"]       { --canvas: #eaf1fb; --taupe: #dfe9f8; }
 [data-board-bg="mint"]      { --canvas: #e8f5ee; --taupe: #dcefe4; }
@@ -803,6 +807,7 @@ body:has(.modal-backdrop), body:has(.side-panel-backdrop) { overflow: hidden; }
 /* Dark mode keeps the hue but drops the lightness, so the tint stays recognisable. The tint is
    painted as a translucent wash over the animated backdrop (see .trello-shell below), and
    --taupe is left alone so the glass treatment stays uniform across every board. */
+[data-theme="dark"] [data-board-bg="default"]  { --canvas: #07070f; }
 [data-theme="dark"] [data-board-bg="cream"]    { --canvas: #241f16; }
 [data-theme="dark"] [data-board-bg="sky"]      { --canvas: #141c2e; }
 [data-theme="dark"] [data-board-bg="mint"]     { --canvas: #12241b; }
@@ -841,6 +846,11 @@ body:has(.modal-backdrop), body:has(.side-panel-backdrop) { overflow: hidden; }
 .bg-swatch:hover { transform: translateY(-2px); border-color: var(--ash); }
 .bg-swatch.selected { border-color: var(--ink); box-shadow: 0 0 0 2px var(--surface) inset; }
 /* Swatches preview the gradient when the theme has one, otherwise the flat tint. */
+/* Each swatch previews its own theme. --board-gradient is cleared on the picker because only the
+   gradient themes set one: without the reset a solid swatch inherits whatever gradient the
+   surrounding board happens to be painted with, so inside a board every solid option showed that
+   board's colour instead of its own. Gradient swatches set it again on themselves and still win. */
+.bg-picker { --board-gradient: initial; }
 .bg-swatch > i { width: 100%; height: 100%; display: block; border-radius: 8px; background: var(--board-gradient, var(--canvas)); }
 .bg-swatch svg { position: absolute; color: var(--ink); }
 .bg-swatch { position: relative; overflow: hidden; }
