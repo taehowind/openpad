@@ -164,7 +164,7 @@ textarea { resize: vertical; line-height: 1.55; }
 .login-card > p { margin: 0 0 28px; color: var(--smoke); font-size: 15px; }
 /* Stacked label-above-input fields. A checkbox row is not one of those — it sets its own
    single-line flex layout, which this would otherwise outrank on specificity. */
-.login-card label:not(.checkbox-row), .modal-card label:not(.checkbox-row), .modal-card .field, .settings-form label, .dialog-field { display: grid; gap: 8px; margin-bottom: 18px; }
+.login-card label:not(.checkbox-row), .modal-card label:not(.checkbox-row), .modal-card .field, .settings-form label:not(.checkbox-row), .dialog-field { display: grid; gap: 8px; margin-bottom: 18px; }
 .login-card label span, .modal-card label > span, .modal-card .field > span, .modal-card .field > label, .settings-form label > span, .dialog-field > span { font-size: 13px; font-weight: 500; color: var(--graphite); }
 .login-card .primary-button { width: 100%; margin-top: 8px; }
 .secure-note, .share-gate-card > small { margin-top: 18px; display: flex; align-items: center; justify-content: center; gap: 6px; color: var(--ash); font-size: 12px; }
@@ -300,6 +300,16 @@ textarea { resize: vertical; line-height: 1.55; }
 .share-code-block small b { color: var(--graphite); font-weight: 500; font-family: var(--font-geist-mono), monospace; }
 
 /* Change / clear, under the entry code the settings screen shows back. */
+/* The entry password, shown the way a room code should be: big, spaced, and unmistakable — but
+   editable in place, so the screen holds one of it rather than a display copy and a form copy. */
+.entry-code-block { margin-bottom: 18px; padding: 16px; display: grid; gap: 10px; text-align: center; background: var(--taupe); border: 1px solid var(--border); border-radius: 16px; }
+.entry-code-block > span { font-size: 12px; font-weight: 500; color: var(--smoke); letter-spacing: .06em; }
+.entry-code-input { width: 100%; padding: 6px 10px; text-align: center; font-family: var(--font-geist-mono), monospace; font-size: 27px; font-weight: 500; letter-spacing: .2em; color: var(--ink); background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+.entry-code-input:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+.entry-code-block small { color: var(--smoke); font-size: 12px; line-height: 1.5; }
+.entry-code-copy { justify-self: center; display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 14px; color: var(--ink); background: var(--surface); border: 1px solid var(--btn-border); border-radius: 9999px; font-size: 13px; transition: background .15s; }
+.entry-code-copy:hover { background: var(--stone); }
+
 .share-code-actions { display: flex; justify-content: center; gap: 8px; }
 .share-code-actions button { min-height: 34px; padding: 0 14px; color: var(--ink); background: var(--surface); border: 1px solid var(--btn-border); border-radius: 9999px; font-size: 13px; transition: background .15s, color .15s, border-color .15s; }
 .share-code-actions button:hover { background: var(--stone); }
@@ -674,6 +684,7 @@ textarea { resize: vertical; line-height: 1.55; }
 .version-item b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 500; }.version-item small { margin-top: 2px; color: var(--smoke); font-size: 11px; }
 .version-item > button { padding: 8px 12px; display: inline-flex; align-items: center; gap: 6px; color: var(--ink); border: 1px solid var(--btn-border); border-radius: 9999px; background: var(--surface); font-size: 12px; transition: background .15s; }
 .version-item > button:hover { background: var(--taupe); }
+.settings-form .bg-picker { margin-bottom: 22px; }
 .settings-form .share-link-box { margin-bottom: 18px; }
 .settings-form > .primary-button { width: 100%; }
 

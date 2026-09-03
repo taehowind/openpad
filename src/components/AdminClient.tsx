@@ -159,10 +159,10 @@ export function AdminClient() {
     setSharePasswordDraft(board?.accessPassword ?? "");
   }
 
-  async function copyAccessPassword(board: BoardSummary) {
-    if (!board.accessPassword) return;
+  async function copyAccessPassword(value: string) {
+    if (!value) return;
     try {
-      await navigator.clipboard.writeText(board.accessPassword);
+      await navigator.clipboard.writeText(value);
       toast.show("입장 비밀번호를 클립보드에 복사했습니다.", "success");
     } catch {
       toast.show("복사하지 못했습니다. 브라우저 권한을 확인해 주세요.", "error", 4500);
@@ -535,14 +535,6 @@ export function AdminClient() {
           <div className="modal-card share-modal" role="dialog" aria-modal="true" aria-labelledby="share-board-title">
             <button type="button" className="modal-close" aria-label="공유 설정 창 닫기" onClick={() => setShareBoard(null)}><X size={18} /></button>
             <span className="kicker">SHARE BOARD</span><h2 id="share-board-title">{shareBoard.title}</h2><p>아래 주소를 알려 주세요. 입장 비밀번호를 사용하면 함께 알려 주셔야 합니다.</p>
-            {shareBoard.accessPassword && (
-              <div className="share-code-block">
-                <span className="share-code-label">입장 비밀번호</span>
-                <strong className="share-code-value">{shareBoard.accessPassword}</strong>
-                <button type="button" className="share-code-copy" aria-label="입장 비밀번호 복사" onClick={() => void copyAccessPassword(shareBoard)}><Copy size={15} /> 복사</button>
-                <small>수강생이 처음 입장할 때 입력합니다.</small>
-              </div>
-            )}
             <label><span>접근 대상</span>
               <select value={shareBoard.audience} onChange={(event) => void updateAccess(shareBoard, { audience: event.target.value as BoardAudience })} disabled={busy}>
                 <option value="link">링크 가진 누구나 (수강생 포함)</option>
@@ -555,11 +547,11 @@ export function AdminClient() {
                 value={sharePasswordDraft ?? ""}
                 disabled={busy}
                 onChange={({ value }) => setSharePasswordDraft(value)}
-                onCommit={() => {
-                  const next = sharePasswordDraft ?? "";
+                onCommit={(next) => {
                   if (next === (shareBoard.accessPassword ?? "")) return;
                   void updateAccess(shareBoard, { accessPassword: next });
                 }}
+                onCopy={() => void copyAccessPassword(sharePasswordDraft ?? "")}
               />
             )}
             <label><span>권한</span><select value={shareBoard.shareMode} onChange={(event) => void updateAccess(shareBoard, { shareMode: event.target.value as ShareMode })} disabled={busy}><option value="readonly">읽기 전용</option><option value="write">읽기·쓰기 가능</option></select></label>
