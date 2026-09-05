@@ -28,7 +28,7 @@ const galleryColumns = [["제출작", "purple"]];
 
 type BoardListRow = {
   id: string; title: string; description: string; share_token: string; share_code: string; share_mode: ShareMode;
-  owner_id: string | null; audience: BoardAudience; access_password: string | null; access_password_hash: string | null; type: BoardType; background: string; created_at: string; updated_at: string;
+  owner_id: string | null; audience: BoardAudience; access_password: string | null; access_password_hash: string | null; type: BoardType; background: string; closed_at: string | null; created_at: string; updated_at: string;
   owner_name: string | null; card_count: number; participant_count: number;
 };
 
@@ -40,6 +40,7 @@ function toSummary(row: BoardListRow): BoardSummary {
     // Only ever sent to the owner's own dashboard; students receive a board payload that has
     // no such field at all.
     accessPassword: row.access_password,
+    closedAt: row.closed_at,
     ownerId: row.owner_id, ownerName: row.owner_name, cardCount: row.card_count, participantCount: row.participant_count,
     createdAt: row.created_at, updatedAt: row.updated_at,
   };

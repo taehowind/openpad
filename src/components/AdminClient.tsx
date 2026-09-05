@@ -437,12 +437,13 @@ export function AdminClient() {
         ) : (
           <div className="dashboard-grid">
             {boards.map((board, index) => (
-              <article className={`dashboard-board board-cover-${index % 4}`} key={board.id} onClick={() => router.push(`/board/${board.id}`)}>
+              <article className={`dashboard-board board-cover-${index % 4}`} data-closed={board.closedAt ? "true" : undefined} key={board.id} onClick={() => router.push(`/board/${board.id}`)}>
                 <div className="board-card-head">
                   <div className="board-badges">
                     <span className="permission-badge">{board.shareMode === "write" ? <Pencil size={13} /> : <Eye size={13} />}{board.shareMode === "write" ? "읽기·쓰기" : "읽기 전용"}</span>
                     {board.audience === "members" && <span className="audience-badge"><Shield size={12} /> 회원 전용</span>}
                     {board.requirePassword && <span className="audience-badge lock"><Lock size={12} /> 비밀번호</span>}
+                    {board.closedAt && <span className="audience-badge closed"><Lock size={12} /> 마감</span>}
                   </div>
                   <button className="more-button" onClick={(event) => { event.stopPropagation(); openShareBoard(board); }} aria-label="공유 설정"><MoreHorizontal size={19} /></button>
                 </div>

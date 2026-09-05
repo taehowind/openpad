@@ -289,6 +289,12 @@ textarea { resize: vertical; line-height: 1.55; }
 .board-badges { display: flex; gap: 6px; align-items: center; }
 .audience-badge { display: inline-flex; align-items: center; gap: 5px; padding: 6px 10px; border-radius: 9999px; background: var(--taupe); color: var(--graphite); font-size: 12px; font-weight: 500; }
 .audience-badge.lock { color: var(--warn-text); background: var(--warn-surface); }
+/* A finished board still belongs in the list, but should not compete with the live ones for
+   attention: it keeps its badge and loses its colour. */
+.audience-badge.closed { color: var(--canvas); background: var(--ink); }
+.dashboard-board[data-closed] { background: var(--taupe); }
+.dashboard-board[data-closed]::before { background: var(--ash); }
+.dashboard-board[data-closed] .board-card-copy { opacity: .72; }
 .board-owner { color: var(--ash); font-size: 12px; }
 
 .share-code-block { margin-bottom: 18px; padding: 18px; display: grid; gap: 10px; text-align: center; background: var(--taupe); border: 1px solid var(--border); border-radius: 16px; }
@@ -1284,6 +1290,12 @@ html[data-theme="dark"] { background: #07070f; }
 }
 [data-theme="dark"] .dashboard-grid > article:hover {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2), 0 18px 48px rgba(0, 0, 0, .5);
+}
+/* A closed board sits out the glass treatment: flat and darker, so it reads as finished next to
+   the live ones. Needs the same specificity as the rule above to take it off them. */
+[data-theme="dark"] .dashboard-grid > article[data-closed] {
+  background-color: rgba(10, 11, 18, .74);
+  background-image: none;
 }
 
 /* Without backdrop-filter the translucency would sit straight on the moving backdrop and hurt

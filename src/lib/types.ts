@@ -158,6 +158,8 @@ export type BoardSummary = {
   requirePassword: boolean;
   /** The entry code as written, so the owner's dashboard can show it. Never sent to students. */
   accessPassword?: string | null;
+  /** When the board was closed, or null while it is open. */
+  closedAt: string | null;
   ownerId: string | null;
   ownerName: string | null;
   createdAt: string;
