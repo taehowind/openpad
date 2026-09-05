@@ -29,6 +29,8 @@ export type BoardRow = {
   access_password_hash: string | null;
   type: BoardType;
   background: string;
+  /** When the teacher closed the board. Null while it is open — see actorForBoard(). */
+  closed_at: string | null;
   created_at: string;
   updated_at: string;
 };

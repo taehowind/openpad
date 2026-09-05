@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { actorForBoard } from "@/lib/access";
+import { actorForBoard, isBoardClosed } from "@/lib/access";
 import { getBoardById, now, recordAction } from "@/lib/board-data";
 import { run, transaction } from "@/lib/db";
 import { apiError, rateLimited } from "@/lib/http";
@@ -13,6 +13,9 @@ export async function POST(request: Request, context: Context) {
   const { slug: boardId } = await context.params;
   const board = (await getBoardById(boardId));
   if (!board) return apiError("보드를 찾을 수 없습니다.", 404);
+  // Q&A stays open on a read-only board on purpose — actorForBoard is called without requireWrite.
+  // A closed board is different: the class is over, so nothing more is added to it.
+  if (isBoardClosed(board)) return apiError("마감된 보드입니다. 더 이상 질문을 남길 수 없습니다.", 409, "BOARD_CLOSED");
   const access = await actorForBoard(board);
   if (!access) return apiError("채팅 권한이 없습니다.", 403);
   const actorKey = access.isAdmin ? "teacher" : access.participant!.participantId;

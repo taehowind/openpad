@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { boardManager } from "@/lib/access";
+import { boardManager, isBoardClosed } from "@/lib/access";
 import { getBoardById, now, recordAction } from "@/lib/board-data";
 import { all, get, run, transaction } from "@/lib/db";
 import { apiError } from "@/lib/http";
@@ -26,6 +26,7 @@ export async function POST(request: Request, context: Context) {
   if (!board) return apiError("보드를 찾을 수 없습니다.", 404);
   const manager = await boardManager(board);
   if (!manager) return apiError("이 보드를 관리할 권한이 없습니다.", 403);
+  if (isBoardClosed(board)) return apiError("마감된 보드입니다. ‘게시’를 눌러 다시 열어 주세요.", 409, "BOARD_CLOSED");
   const parsed = createSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return apiError("목록 이름을 입력해 주세요.");
   const id = randomUUID();
@@ -45,6 +46,7 @@ export async function PATCH(request: Request, context: Context) {
   if (!board) return apiError("보드를 찾을 수 없습니다.", 404);
   const manager = await boardManager(board);
   if (!manager) return apiError("이 보드를 관리할 권한이 없습니다.", 403);
+  if (isBoardClosed(board)) return apiError("마감된 보드입니다. ‘게시’를 눌러 다시 열어 주세요.", 409, "BOARD_CLOSED");
   const parsed = updateSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return apiError("변경할 목록 정보를 확인해 주세요.");
 
@@ -96,6 +98,7 @@ export async function DELETE(request: Request, context: Context) {
   if (!board) return apiError("보드를 찾을 수 없습니다.", 404);
   const manager = await boardManager(board);
   if (!manager) return apiError("이 보드를 관리할 권한이 없습니다.", 403);
+  if (isBoardClosed(board)) return apiError("마감된 보드입니다. ‘게시’를 눌러 다시 열어 주세요.", 409, "BOARD_CLOSED");
   const parsed = deleteSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return apiError("삭제할 목록을 확인해 주세요.");
 

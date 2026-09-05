@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { boardManager } from "@/lib/access";
+import { boardManager, isBoardClosed } from "@/lib/access";
 import { createRevision, getBoardById, now, recordAction, restoreRevision } from "@/lib/board-data";
 import { run, transaction } from "@/lib/db";
 import { apiError } from "@/lib/http";
@@ -31,6 +31,8 @@ export async function POST(request: Request, context: Context) {
     }));
     return NextResponse.json({ ok: true });
   }
+  // Snapshotting a finished class is fine; replaying a snapshot over it is a write.
+  if (isBoardClosed(board)) return apiError("마감된 보드입니다. ‘게시’를 눌러 다시 열어 주세요.", 409, "BOARD_CLOSED");
   const revisionId = parsed.data.revisionId;
   (await transaction(async () => {
     if (!(await restoreRevision(boardId, revisionId))) throw new Error("REVISION_NOT_FOUND");

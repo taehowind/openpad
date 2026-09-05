@@ -143,6 +143,7 @@ export async function getBoardPayload(
       shareMode: board.share_mode,
       type: board.type,
       background: normalizeBackground(board.background),
+      closedAt: board.closed_at,
       ...(viewer.isAdmin ? {
         shareToken: board.share_token,
         shareCode: board.share_code,
@@ -162,7 +163,8 @@ export async function getBoardPayload(
     activeViewers,
     chatMessages,
     isAdmin: viewer.isAdmin,
-    canWrite: viewer.isAdmin || board.share_mode === "write",
+    // A closed board is read-only for everyone, the teacher included — see actorForBoard().
+    canWrite: (viewer.isAdmin || board.share_mode === "write") && !board.closed_at,
     realtime: supportsRealtimePush(),
     participant: viewer.participantId ? {
       id: viewer.participantId,

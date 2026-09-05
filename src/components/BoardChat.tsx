@@ -8,6 +8,8 @@ type BoardChatProps = {
   messages: ChatMessage[];
   onSend: (content: string) => Promise<boolean>;
   canModerate?: boolean;
+  /** A closed board takes no more questions; the composer says so instead of failing on send. */
+  closed?: boolean;
   onHide?: (id: string, hidden: boolean) => Promise<void>;
   onDelete?: (id: string) => Promise<void>;
 };
@@ -25,7 +27,7 @@ const OVERLAY_WIDTH = "(max-width: 920px)";
 
 const isOverlayWidth = () => typeof window !== "undefined" && window.matchMedia(OVERLAY_WIDTH).matches;
 
-export function BoardChat({ messages, onSend, canModerate = false, onHide, onDelete }: BoardChatProps) {
+export function BoardChat({ messages, onSend, canModerate = false, closed = false, onHide, onDelete }: BoardChatProps) {
   const [content, setContent] = useState("");
   const [busy, setBusy] = useState(false);
   // Narrow viewports start collapsed. Expanded, the panel covers the board it is meant to
@@ -113,8 +115,9 @@ export function BoardChat({ messages, onSend, canModerate = false, onHide, onDel
           ))}
         </div>
         <form className="chat-compose" onSubmit={submit}>
-          <textarea value={content} onChange={(event) => setContent(event.target.value)} maxLength={1000} rows={2} placeholder="강사에게 질문하기" />
-          <button disabled={busy || !content.trim()} aria-label="채팅 보내기"><Send size={16} /></button>
+          <textarea value={content} onChange={(event) => setContent(event.target.value)} maxLength={1000} rows={2}
+            disabled={closed} placeholder={closed ? "마감된 보드입니다" : "강사에게 질문하기"} />
+          <button disabled={closed || busy || !content.trim()} aria-label="채팅 보내기"><Send size={16} /></button>
         </form>
       </div>
     </aside>

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
   Activity, ArrowLeft, ArrowRightLeft, Check, ChevronLeft, ChevronRight, Clock3, Code2, Copy, Download, ExternalLink, Eye, File,
-  FileClock, GripVertical, Heart, History, Link2, Lock, LockKeyhole, Maximize2, MessageSquare, MonitorPlay, MoreHorizontal, Paperclip,
+  FileClock, GripVertical, Heart, History, Link2, Lock, LockKeyhole, LockOpen, Maximize2, MessageSquare, MonitorPlay, MoreHorizontal, Paperclip,
   Palette, Pencil, Plus, QrCode, RefreshCw, RotateCcw, Save, Send, Settings2, Shield, ShieldCheck, Sparkles, Trash2, Upload, X,
   FolderInput,
 } from "lucide-react";
@@ -966,6 +966,35 @@ export function BoardClient({ identifier, mode }: BoardClientProps) {
     });
   }
 
+  // 마감 freezes the board; 게시 opens it again. Both are the same board PATCH, and the button
+  // swaps in place so the teacher always finds the control where they left it.
+  async function toggleClosed() {
+    if (!data?.isAdmin) return;
+    const closing = !data.board.closedAt;
+    const ok = await dialog.confirm(closing ? {
+      title: "이 보드를 마감할까요?",
+      message: "마감하면 강사와 수강생 모두 이 보드를 더 이상 수정할 수 없습니다. ‘게시’를 누르면 언제든 다시 열 수 있습니다.",
+      confirmLabel: "마감",
+    } : {
+      title: "이 보드를 다시 게시할까요?",
+      message: "다시 게시하면 마감 전처럼 카드와 댓글을 쓸 수 있습니다.",
+      confirmLabel: "게시",
+    });
+    if (!ok) return;
+    await runAction(
+      closing ? "보드를 마감하는 중…" : "보드를 게시하는 중…",
+      closing ? "보드를 마감했습니다." : "보드를 다시 게시했습니다.",
+      closing ? "보드를 마감하지 못했습니다." : "보드를 게시하지 못했습니다.",
+      async () => {
+        const response = await fetch(`/api/boards/${data.board.id}`, {
+          method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ closed: closing }),
+        });
+        if (!response.ok) throw new Error(await responseError(response, "보드 상태를 바꾸지 못했습니다."));
+        await load(true);
+      },
+    );
+  }
+
   async function restore(revision: RevisionEntry) {
     if (!data?.isAdmin) return;
     const ok = await dialog.confirm({
@@ -1024,7 +1053,10 @@ export function BoardClient({ identifier, mode }: BoardClientProps) {
 
   if (!data) return null;
   const shareUrl = data.board.shareCode ? `${window.location.origin}/wz/${data.board.shareCode}` : "";
-  const canManageCard = (card: BoardCard) => data.isAdmin || (!!data.participant && card.authorId === data.participant.id);
+  // Editing rights, not just ownership: a closed (or read-only) board offers no edit affordance
+  // to anyone, so the menus match what the API will actually accept.
+  const canManageCard = (card: BoardCard) => data.canWrite
+    && (data.isAdmin || (!!data.participant && card.authorId === data.participant.id));
   const isGallery = data.board.type === "gallery";
   const galleryItems = isGallery ? [...data.cards].sort((a, b) => b.createdAt.localeCompare(a.createdAt)) : [];
   const previewCard = galleryPreview ? data.cards.find((c) => c.id === galleryPreview.id) ?? galleryPreview : null;
@@ -1033,7 +1065,7 @@ export function BoardClient({ identifier, mode }: BoardClientProps) {
   // Manual layout: each list has a grid column (gridCol) and stacks vertically by position.
   // Admins get one extra empty trailing column to start a new column in.
   const maxGridCol = data.columns.reduce((max, column) => Math.max(max, column.gridCol), -1);
-  const gridColCount = Math.max(1, maxGridCol + 1 + (data.isAdmin ? 1 : 0));
+  const gridColCount = Math.max(1, maxGridCol + 1 + (data.isAdmin && data.canWrite ? 1 : 0));
   const gridColumns: (typeof data.columns)[] = Array.from({ length: gridColCount }, () => []);
   data.columns.forEach((column) => gridColumns[Math.max(0, Math.min(gridColCount - 1, column.gridCol))].push(column));
 
@@ -1055,6 +1087,9 @@ export function BoardClient({ identifier, mode }: BoardClientProps) {
             <button onClick={() => void copyShareLink()} title="공유 링크 복사"><Copy size={17} /><span>링크</span></button>
             <button onClick={() => setQrOpen(true)} disabled={!shareUrl} title="공유 QR 코드"><QrCode size={17} /><span>QR</span></button>
             <button onClick={() => void saveFinal()} title="최종본 저장"><Save size={17} /><span>최종본</span></button>
+            {data.board.closedAt
+              ? <button className="reopen-button" onClick={() => void toggleClosed()} title="다시 수정할 수 있게 게시"><LockOpen size={17} /><span>게시</span></button>
+              : <button className="close-button" onClick={() => void toggleClosed()} title="수업을 마치고 보드를 잠금"><Lock size={17} /><span>마감</span></button>}
           </>}
           <ThemeToggle className="" />
           <button className="icon-only" onClick={() => void refreshBoard()} aria-label="새로고침" title="새로고침"><RefreshCw size={17} /></button>
@@ -1071,7 +1106,9 @@ export function BoardClient({ identifier, mode }: BoardClientProps) {
       </header>
 
       {error && <div className="floating-error">{error}<button onClick={() => setError("")}><X size={15} /></button></div>}
-      {!data.canWrite && <div className="readonly-banner"><Eye size={16} /><span>보드 카드는 읽기 전용입니다. 오른쪽 Q&amp;A 채팅에는 질문을 남길 수 있습니다.</span></div>}
+      {data.board.closedAt
+        ? <div className="readonly-banner closed-banner"><Lock size={16} /><span>마감된 보드입니다. 더 이상 수정할 수 없습니다.{data.isAdmin && " 위의 ‘게시’를 누르면 다시 열립니다."}</span></div>
+        : !data.canWrite && <div className="readonly-banner"><Eye size={16} /><span>보드 카드는 읽기 전용입니다. 오른쪽 Q&amp;A 채팅에는 질문을 남길 수 있습니다.</span></div>}
 
       <div className="board-workspace">
         {isGallery ? (
@@ -1122,7 +1159,7 @@ export function BoardClient({ identifier, mode }: BoardClientProps) {
         <section className="trello-board" onPointerDown={startPan} onPointerMove={movePan} onPointerUp={endPan} onPointerCancel={endPan}>
           <div className="masonry">
           {gridColumns.map((colLists, gridIndex) => {
-            if (!data.isAdmin && colLists.length === 0) return null;
+            if ((!data.isAdmin || !data.canWrite) && colLists.length === 0) return null;
             return (
             <div
               className={`masonry-col ${gridColDropTarget === gridIndex ? "col-drop" : ""}`}
@@ -1160,10 +1197,10 @@ export function BoardClient({ identifier, mode }: BoardClientProps) {
             >
               <header>
                 <div className="list-heading">
-                  {data.isAdmin && <GripVertical className="list-drag-handle" size={17} aria-hidden="true" />}
+                  {data.isAdmin && data.canWrite && <GripVertical className="list-drag-handle" size={17} aria-hidden="true" />}
                   <span className={`list-dot color-${column.color}`} /><h2>{column.name}</h2><small>{grouped.get(column.id)?.length ?? 0}</small>
                 </div>
-                {data.isAdmin && (
+                {data.isAdmin && data.canWrite && (
                   <div className="list-menu">
                     <button
                       type="button"
@@ -1246,14 +1283,14 @@ export function BoardClient({ identifier, mode }: BoardClientProps) {
               {data.canWrite && <button className="add-card-button" onClick={() => { setSelectedFileName(""); setComposerColumn(column.id); }}><Plus size={17} /> 카드 추가</button>}
             </article>
           ))}
-          {data.isAdmin && <button className="add-list-button" onClick={() => void addColumn(gridIndex)}><Plus size={17} /> {colLists.length === 0 ? "여기에 새 열" : "목록 추가"}</button>}
+          {data.isAdmin && data.canWrite && <button className="add-list-button" onClick={() => void addColumn(gridIndex)}><Plus size={17} /> {colLists.length === 0 ? "여기에 새 열" : "목록 추가"}</button>}
             </div>
             );
           })}
           </div>
         </section>
         )}
-        {!isGallery && <BoardChat messages={data.chatMessages} onSend={sendChat} canModerate={data.isAdmin} onHide={hideChatMessage} onDelete={deleteChatMessage} />}
+        {!isGallery && <BoardChat messages={data.chatMessages} onSend={sendChat} canModerate={data.isAdmin} closed={!!data.board.closedAt} onHide={hideChatMessage} onDelete={deleteChatMessage} />}
       </div>
 
       {composerColumn && (

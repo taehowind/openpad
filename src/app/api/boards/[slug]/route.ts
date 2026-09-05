@@ -18,6 +18,8 @@ const patchSchema = z.object({
   accessPassword: z.string().max(100).optional(),
   background: z.string().trim().max(30).optional(),
   rotateShareLink: z.boolean().optional(),
+  /** true = 마감 (freeze the board), false = 게시 (reopen it). */
+  closed: z.boolean().optional(),
 });
 
 export async function GET(_: Request, context: Context) {
@@ -46,14 +48,21 @@ export async function PATCH(request: Request, context: Context) {
     ? board.access_password
     : (parsed.data.accessPassword.trim() || null);
   const legacyHash = parsed.data.accessPassword === undefined ? board.access_password_hash : null;
+  // Closing stamps the time; reopening clears it. Re-closing an already closed board keeps the
+  // original timestamp, so the banner does not jump when a form resubmits the same value.
+  const closedAt = parsed.data.closed === undefined
+    ? board.closed_at
+    : (parsed.data.closed ? (board.closed_at ?? now()) : null);
   (await transaction(async () => {
-    (await run(`UPDATE boards SET title = ?, description = ?, share_mode = ?, audience = ?, access_password = ?, access_password_hash = ?, background = ?, share_token = ?, share_code = ?, updated_at = ? WHERE id = ?`,
+    (await run(`UPDATE boards SET title = ?, description = ?, share_mode = ?, audience = ?, access_password = ?, access_password_hash = ?, background = ?, closed_at = ?, share_token = ?, share_code = ?, updated_at = ? WHERE id = ?`,
       parsed.data.title ?? board.title, parsed.data.description ?? board.description,
       parsed.data.shareMode ?? board.share_mode, parsed.data.audience ?? board.audience, accessPassword, legacyHash,
       parsed.data.background === undefined ? normalizeBackground(board.background) : normalizeBackground(parsed.data.background),
-      shareToken, shareCode, now(), id));
-    (await recordAction(id, { type: "teacher", name: manager.name },
-      parsed.data.rotateShareLink ? "공유 링크를 새로 발급했습니다" : "보드 설정을 변경했습니다", "board", id,
+      closedAt, shareToken, shareCode, now(), id));
+    const action = parsed.data.closed === undefined
+      ? (parsed.data.rotateShareLink ? "공유 링크를 새로 발급했습니다" : "보드 설정을 변경했습니다")
+      : (parsed.data.closed ? "보드를 마감했습니다" : "보드를 다시 게시했습니다");
+    (await recordAction(id, { type: "teacher", name: manager.name }, action, "board", id,
       { shareMode: parsed.data.shareMode ?? board.share_mode }));
   }));
   return NextResponse.json({ ok: true, shareToken, shareCode });

@@ -382,6 +382,13 @@ textarea { resize: vertical; line-height: 1.55; }
 .active-avatars > span.avatar-overflow { color: var(--canvas); background: var(--graphite); font-size: 10px; font-weight: 700; }
 .active-viewers small { display: flex; align-items: center; gap: 6px; color: var(--smoke); font-size: 12px; white-space: nowrap; }
 .active-viewers small i { width: 7px; height: 7px; background: var(--ok); border-radius: 50%; box-shadow: 0 0 0 3px rgba(31, 122, 82, .18); }
+/* 마감 is the one destructive-feeling control up here, and 게시 the way back out, so both carry
+   a filled treatment that the neutral pill buttons around them do not. */
+.board-topbar-actions button.close-button { color: var(--canvas); background: var(--ink); border-color: var(--ink); }
+.board-topbar-actions button.close-button:hover { background: var(--graphite); border-color: var(--graphite); }
+.board-topbar-actions button.reopen-button { color: var(--ok); background: var(--ok-surface); border-color: transparent; font-weight: 500; }
+.board-topbar-actions button.reopen-button:hover { background: var(--ok-surface); filter: brightness(.97); }
+.closed-banner { color: var(--ink); background: var(--taupe); border-color: var(--border); font-weight: 500; }
 .readonly-banner { margin: 0 26px 10px; padding: 11px 15px; display: flex; align-items: center; gap: 9px; color: var(--warn-text); background: var(--warn-surface); border: 1px solid var(--warn-border); border-radius: 12px; font-size: 13px; }
 .floating-error { position: fixed; z-index: 150; top: 72px; left: 50%; transform: translateX(-50%); max-width: min(90vw, 620px); padding: 12px 15px; display: flex; align-items: center; gap: 15px; color: var(--danger-text); background: var(--danger-surface); border: 1px solid var(--danger-border); border-radius: 12px; box-shadow: var(--shadow-card); font-size: 14px; }
 .floating-error button { color: inherit; border: 0; background: none; }

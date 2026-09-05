@@ -116,6 +116,8 @@ export type BoardPayload = {
     shareMode: ShareMode;
     type: BoardType;
     background: BoardBackground;
+    /** When the teacher closed the board, or null while it is open. */
+    closedAt: string | null;
     shareToken?: string;
     shareCode?: string;
     audience?: BoardAudience;

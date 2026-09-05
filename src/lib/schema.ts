@@ -170,6 +170,9 @@ const ADDED_COLUMNS: [table: string, column: string, definition: string][] = [
   // The entry code a teacher reads out to a room. Stored as written because the settings
   // screen has to show it back — see the note on boards.access_password in board-data.ts.
   ["boards", "access_password", "TEXT"],
+  // Set when a teacher closes the board after class. Null means open; the timestamp is what
+  // the board screen shows, so it is stored rather than a bare flag.
+  ["boards", "closed_at", "TEXT"],
 ];
 
 async function migrate(driver: Driver) {
@@ -198,7 +201,7 @@ async function migrate(driver: Driver) {
  * new index. It is what tells a deployment its database is behind, so treat bumping it as part of
  * the edit rather than an afterthought: forget, and the migration never runs.
  */
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 const META_TABLE = "CREATE TABLE IF NOT EXISTS schema_meta (id INTEGER PRIMARY KEY, version INTEGER NOT NULL)";
 

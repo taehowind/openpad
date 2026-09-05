@@ -44,7 +44,17 @@ export async function canViewBoardContent(board: BoardRow) {
   return Boolean(await actorForBoard(board, false));
 }
 
+/**
+ * A closed board is frozen: the class is over and nothing more may be written to it — not by a
+ * student, and not by the teacher either. Reopening is a management action ("게시"), so it goes
+ * through boardManager() rather than this gate and stays available while the board is closed.
+ */
+export function isBoardClosed(board: BoardRow) {
+  return Boolean(board.closed_at);
+}
+
 export async function actorForBoard(board: BoardRow, requireWrite = false) {
+  if (requireWrite && isBoardClosed(board)) return null;
   const session = await getInstructorSession();
 
   // Owner or super-admin → full teacher control. The identity key is per-instructor so two
