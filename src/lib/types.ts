@@ -74,6 +74,11 @@ export type BoardCard = {
   content: string;
   linkUrl: string | null;
   fileId: string | null;
+  /**
+   * A gallery work's snapshot, taken once when it was registered. Null for works uploaded before
+   * snapshots existed, or where the capture did not finish — the grid falls back to a live frame.
+   */
+  thumbFileId: string | null;
   fileName: string | null;
   fileType: string | null;
   fileSize: number | null;

@@ -51,3 +51,65 @@ export async function attachFile(boardId: string, form: FormData, file: File) {
   form.append("fileType", file.type || "application/octet-stream");
   return form;
 }
+
+/**
+ * Photographs a freshly registered gallery work, once, so the grid can show a picture instead of
+ * running every student's program on every visit.
+ *
+ * The work is loaded in a hidden sandboxed frame that carries the capture bootstrap (see
+ * src/lib/gallery.ts) and reports back by postMessage. Everything about that reply is untrusted —
+ * it comes from the work's own code — so it is matched to this frame, checked to be a JPEG data
+ * URL, and size-capped before it is sent on. A failure is not an error the author needs to see:
+ * the card simply keeps the live frame it had before.
+ */
+export async function captureGalleryThumb(cardId: string, timeoutMs = 15000) {
+  if (typeof window === "undefined") return false;
+  const frame = document.createElement("iframe");
+  // Deliberately no sandbox attribute. The response sandboxes itself — its Content-Security-Policy
+  // carries the sandbox directive, which is what puts the work in an opaque origin where it cannot
+  // reach our DOM or cookies (verified: contentDocument is inaccessible). Adding the attribute on
+  // top of that CSP stops the document's scripts running at all, which would include the snapshot
+  // bootstrap we are here to run.
+  frame.setAttribute("aria-hidden", "true");
+  // Rendered but invisible, rather than parked off-screen: a frame the browser decides is not
+  // being shown lays nothing out, and the snapshot would come back the size of nothing.
+  frame.style.cssText = "position:fixed;top:0;left:0;width:1024px;height:768px;border:0;"
+    + "opacity:0;pointer-events:none;z-index:-2147483647;";
+
+  const dataUrl = await new Promise<string | null>((resolve) => {
+    let settled = false;
+    const finish = (value: string | null) => {
+      if (settled) return;
+      settled = true;
+      window.removeEventListener("message", onMessage);
+      clearTimeout(timer);
+      frame.remove();
+      resolve(value);
+    };
+    const onMessage = (event: MessageEvent) => {
+      if (event.source !== frame.contentWindow) return;
+      const payload = event.data as { openpadThumb?: unknown } | null;
+      if (!payload || typeof payload !== "object" || !("openpadThumb" in payload)) return;
+      const thumb = payload.openpadThumb;
+      const ok = typeof thumb === "string"
+        && thumb.startsWith("data:image/jpeg;base64,")
+        && thumb.length < 4_000_000;
+      finish(ok ? (thumb as string) : null);
+    };
+    const timer = setTimeout(() => finish(null), timeoutMs);
+    window.addEventListener("message", onMessage);
+    frame.src = `/api/embed/${cardId}?capture=1`;
+    document.body.appendChild(frame);
+  });
+  if (!dataUrl) return false;
+
+  try {
+    const blob = await (await fetch(dataUrl)).blob();
+    const form = new FormData();
+    form.append("thumb", new File([blob], "thumb.jpg", { type: "image/jpeg" }));
+    const response = await fetch(`/api/cards/${cardId}/thumb`, { method: "POST", body: form });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}

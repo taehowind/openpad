@@ -51,7 +51,9 @@ export async function PATCH(request: Request, context: Context) {
         (await run(`INSERT INTO files (id, board_id, original_name, stored_name, mime_type, size_bytes, created_at)
              VALUES (?, ?, ?, ?, ?, ?, ?)`, newFileId, board.id, path.basename(file.name).slice(0, 255), newStoredName,
           safeMimeType(file.type), file.size, timestamp));
-        await run("UPDATE cards SET file_id = ? WHERE id = ?", newFileId, id);
+        // The snapshot belongs to the old HTML. Drop it so the grid falls back to a live frame
+        // until the author's browser sends a new one.
+        await run("UPDATE cards SET file_id = ?, thumb_file_id = NULL WHERE id = ?", newFileId, id);
       }
       await run("UPDATE boards SET updated_at = ? WHERE id = ?", timestamp, board.id);
       await recordAction(board.id, access.actor, "작품을 수정했습니다", "card", id, { title });

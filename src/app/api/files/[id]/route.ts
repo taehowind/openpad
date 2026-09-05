@@ -44,7 +44,10 @@ export async function GET(_: Request, context: Context) {
       ...(upload.size !== null ? { "Content-Length": String(upload.size) } : {}),
       "Content-Disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(file.original_name)}`,
       "Content-Security-Policy": "sandbox;",
-      "Cache-Control": "private, max-age=300",
+      // A file id never points at different bytes: uploads are written fail-if-exists, and
+      // replacing an attachment mints a new id. So the browser can keep it and stop asking —
+      // which is what makes a gallery snapshot cost one request instead of one per visit.
+      "Cache-Control": "private, max-age=31536000, immutable",
       "X-Content-Type-Options": "nosniff",
     },
   });

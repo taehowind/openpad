@@ -173,6 +173,9 @@ const ADDED_COLUMNS: [table: string, column: string, definition: string][] = [
   // Set when a teacher closes the board after class. Null means open; the timestamp is what
   // the board screen shows, so it is stored rather than a bare flag.
   ["boards", "closed_at", "TEXT"],
+  // The gallery thumbnail, captured once when the work is registered. Points at a files row like
+  // file_id does, so it is cleaned up with the board and served through /api/files.
+  ["cards", "thumb_file_id", "TEXT"],
 ];
 
 async function migrate(driver: Driver) {
@@ -201,7 +204,7 @@ async function migrate(driver: Driver) {
  * new index. It is what tells a deployment its database is behind, so treat bumping it as part of
  * the edit rather than an afterthought: forget, and the migration never runs.
  */
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 const META_TABLE = "CREATE TABLE IF NOT EXISTS schema_meta (id INTEGER PRIMARY KEY, version INTEGER NOT NULL)";
 

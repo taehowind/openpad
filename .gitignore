@@ -49,3 +49,6 @@ next-env.d.ts
 # server-specific deployment config (domain, proxy, admin bootstrap)
 /deploy/
 /DEPLOY.md
+
+# Third-party browser source, generated from node_modules by scripts/vendor-assets.mjs
+src/generated/

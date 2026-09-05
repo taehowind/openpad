@@ -19,7 +19,7 @@ import { ProfileForm } from "@/components/ProfileForm";
 import { QrModal } from "@/components/QrModal";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useToast } from "@/components/ToastProvider";
-import { attachFile, responseError } from "@/lib/api-client";
+import { attachFile, captureGalleryThumb, responseError } from "@/lib/api-client";
 import { BOARD_BACKGROUNDS, type BoardBackground } from "@/lib/backgrounds";
 import { renderMarkdown } from "@/lib/markdown";
 import type { BoardCard, BoardComment, BoardPayload, BoardSummary, RevisionEntry } from "@/lib/types";
@@ -480,6 +480,8 @@ export function BoardClient({ identifier, mode }: BoardClientProps) {
       const response = await fetch(`/api/boards/${data.board.id}/cards`, { method: "POST", body: upload });
       if (!response.ok) throw new Error(await responseError(response, `작품을 올리지 못했습니다. (${response.status})`));
       // The board refresh is best-effort — the work is already saved at this point.
+      const created = await response.json().catch(() => null) as { id?: string } | null;
+      if (created?.id) await captureGalleryThumb(created.id).catch(() => false);
       await load(true).catch(() => undefined);
       return true;
     });
@@ -605,6 +607,8 @@ export function BoardClient({ identifier, mode }: BoardClientProps) {
     const done = await runAction("작품을 수정하는 중…", "작품을 수정했습니다.", "작품을 수정하지 못했습니다.", async () => {
       const response = await fetch(`/api/cards/${galleryEdit.id}/gallery`, { method: "PATCH", body: upload });
       if (!response.ok) throw new Error(await responseError(response, `작품을 수정하지 못했습니다. (${response.status})`));
+      // Replacing the HTML dropped the old snapshot server-side; take one of the new work.
+      if (file) await captureGalleryThumb(galleryEdit.id).catch(() => false);
       await load(true).catch(() => undefined);
       return true;
     });
@@ -1128,7 +1132,12 @@ export function BoardClient({ identifier, mode }: BoardClientProps) {
                 return (
                   <article className="gallery-item" key={card.id}>
                     <button type="button" className="gallery-thumb" onClick={() => setGalleryPreview(card)} aria-label={`${card.title || "작품"} 크게 보기`}>
-                      <iframe src={`/api/embed/${card.id}?v=${encodeURIComponent(card.updatedAt)}`} title={card.title || "작품 미리보기"} sandbox="allow-scripts allow-popups" scrolling="no" tabIndex={-1} loading="lazy" />
+                      {card.thumbFileId
+                        // A plain <img>: /api/files is private and auth-gated, so next/image would
+                        // add a proxy hop per card and undo the caching this snapshot exists for.
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <img className="gallery-thumb-shot" src={`/api/files/${card.thumbFileId}`} alt={card.title ? `${card.title} 미리보기` : "작품 미리보기"} loading="lazy" decoding="async" />
+                        : <iframe src={`/api/embed/${card.id}?v=${encodeURIComponent(card.updatedAt)}`} title={card.title || "작품 미리보기"} sandbox="allow-scripts allow-popups" scrolling="no" tabIndex={-1} loading="lazy" />}
                       <span className="gallery-thumb-overlay"><Maximize2 size={16} /> 크게 보기</span>
                       <div className="gallery-badges">{isHot && <span className="badge badge-hot">HOT</span>}{isNew && <span className="badge badge-new">NEW</span>}</div>
                     </button>

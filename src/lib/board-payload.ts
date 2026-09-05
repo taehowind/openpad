@@ -47,11 +47,12 @@ export async function getBoardPayload(
         WHERE x.board_id = ? GROUP BY r.card_id`, reactionIdentity, board.id),
     all<{
       id: string; column_id: string; participant_id: string | null; author_name: string; author_emoji: string; actor_type: "teacher" | "guest"; title: string;
-      content: string; link_url: string | null; file_id: string | null; original_name: string | null; share_code: string | null;
+      content: string; link_url: string | null; file_id: string | null; thumb_file_id: string | null;
+      original_name: string | null; share_code: string | null;
       mime_type: string | null; size_bytes: number | null; position: number; created_at: string; updated_at: string;
     }>(`SELECT x.id, x.column_id, x.participant_id, COALESCE(p.nickname, x.author_name) AS author_name,
                CASE WHEN x.actor_type = 'teacher' THEN '🧑‍🏫' ELSE COALESCE(p.emoji, '🙂') END AS author_emoji,
-               x.actor_type, x.title, x.content, x.link_url, x.file_id, x.share_code,
+               x.actor_type, x.title, x.content, x.link_url, x.file_id, x.thumb_file_id, x.share_code,
                f.original_name, f.mime_type, f.size_bytes, x.position, x.created_at, x.updated_at
           FROM cards x LEFT JOIN files f ON f.id = x.file_id
           LEFT JOIN participants p ON p.id = x.participant_id
@@ -91,6 +92,7 @@ export async function getBoardPayload(
     content: card.content,
     linkUrl: card.link_url,
     fileId: card.file_id,
+    thumbFileId: card.thumb_file_id,
     fileName: card.original_name,
     fileType: card.mime_type,
     fileSize: card.size_bytes,
